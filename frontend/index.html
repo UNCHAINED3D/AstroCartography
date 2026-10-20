@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Astrocartography</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="globe"></div>
+    <div id="map2d" class="map2d-container hidden"></div>
+
+    <div class="panel-shell">
+      <aside id="panel">
+        <header class="brand">
+          <div class="brand-mark">✶</div>
+          <div>
+            <h1>Astrocartography</h1>
+            <p class="sub">Map your birth chart onto the Earth.</p>
+          </div>
+          <button type="button" id="togglePanelBtn" class="panel-collapse-btn" title="Toggle sidebar">‹</button>
+        </header>
+
+        <!-- Life Goal Presets -->
+        <div class="goal-presets-block">
+          <div class="goal-presets-title">Life Goal Focus</div>
+          <div id="goalPresets" class="goal-presets-grid">
+            <button type="button" class="goal-btn active" data-goal="all">🌐 All</button>
+            <button type="button" class="goal-btn" data-goal="love">❤️ Love</button>
+            <button type="button" class="goal-btn" data-goal="career">💼 Career</button>
+            <button type="button" class="goal-btn" data-goal="wealth">💰 Wealth</button>
+            <button type="button" class="goal-btn" data-goal="peace">🧘 Peace</button>
+            <button type="button" class="goal-btn" data-goal="growth">🚀 Growth</button>
+          </div>
+        </div>
+
+        <!-- Birth Data -->
+        <details class="section" open>
+          <summary>Birth Data</summary>
+          <div class="section-body">
+            <form id="birthForm">
+              <label>Name
+                <input type="text" id="name" placeholder="e.g. Jane Doe" />
+              </label>
+
+              <div class="row-2">
+                <label>Date
+                  <input type="date" id="date" value="1990-05-15" />
+                </label>
+                <label>Time
+                  <input type="time" id="time" value="14:30" />
+                </label>
+              </div>
+
+              <label>UTC offset (hours)
+                <input type="number" id="offset" value="10" step="0.5" />
+              </label>
+
+              <div class="field autocomplete">
+                <span>Birthplace</span>
+                <input
+                  type="text"
+                  id="citySearch"
+                  placeholder="Search a city…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <ul id="citySuggest" class="suggest" hidden></ul>
+              </div>
+
+              <div class="row-2">
+                <label>Latitude
+                  <input type="number" id="lat" step="0.0001" value="-27.4705" />
+                </label>
+                <label>Longitude
+                  <input type="number" id="lng" step="0.0001" value="153.026" />
+                </label>
+              </div>
+
+              <button type="button" id="useLocation" class="ghost-btn full">
+                Use my location
+              </button>
+
+              <div class="form-actions">
+                <button type="submit" id="compute">Draw chart</button>
+                <button type="button" id="saveEntry" class="ghost-btn">Save</button>
+              </div>
+            </form>
+            <div id="status"></div>
+          </div>
+        </details>
+
+        <!-- Map Layers -->
+        <details class="section" open>
+          <summary>Map Layers</summary>
+          <div class="section-body">
+            <label class="view-toggle">
+              <input type="checkbox" id="dayMode" checked />
+              Daytime globe
+            </label>
+            <label class="view-toggle">
+              <input type="checkbox" id="autoRotate" />
+              Auto-rotate
+            </label>
+            <label class="view-toggle">
+              <input type="checkbox" id="localSpace" />
+              Local Space rays
+            </label>
+            <label class="view-toggle">
+              <input type="checkbox" id="parans" checked />
+              Parans
+            </label>
+            <label class="view-toggle">
+              <input type="checkbox" id="labels" checked />
+              Place labels
+            </label>
+            <div class="slider-row">
+              <label for="globeBrightness">Brightness</label>
+              <input type="range" id="globeBrightness" min="0.2" max="2" step="0.01" value="1" />
+              <span class="slider-val" id="globeBrightnessVal">1.00</span>
+            </div>
+            <div class="slider-row">
+              <label for="globeContrast">Contrast</label>
+              <input type="range" id="globeContrast" min="0.5" max="3" step="0.01" value="1" />
+              <span class="slider-val" id="globeContrastVal">1.00</span>
+            </div>
+          </div>
+        </details>
+
+        <!-- Saved Charts -->
+        <details class="section">
+          <summary>Saved Charts</summary>
+          <div class="section-body">
+            <h2 class="list-title">Saved births</h2>
+            <ul id="savedList"></ul>
+          </div>
+        </details>
+
+        <!-- Saved Places -->
+        <details class="section">
+          <summary>Saved Places</summary>
+          <div class="section-body">
+            <h2 class="list-title">Pinned locations</h2>
+            <ul id="pinList"></ul>
+          </div>
+        </details>
+
+        <!-- Export & Share -->
+        <details class="section">
+          <summary>Export &amp; Share</summary>
+          <div class="section-body export-body">
+            <button type="button" id="shareLink" class="ghost-btn full">🔗 Copy share link</button>
+            <button type="button" id="exportPng" class="ghost-btn full">📸 Save globe image (PNG)</button>
+            <button type="button" id="exportGeojson" class="ghost-btn full">🗺 Export lines (GeoJSON)</button>
+            <button type="button" id="exportKml" class="ghost-btn full">🌍 Export lines (KML)</button>
+            <button type="button" id="printReport" class="ghost-btn full">🖨 Print / PDF report</button>
+          </div>
+        </details>
+
+        <!-- Legend -->
+        <details class="section" open>
+          <summary>Legend</summary>
+          <div class="section-body">
+            <div id="legend">
+              <div class="legend-block">
+                <h2>Planets</h2>
+                <div id="planetToggles" class="legend-grid"></div>
+              </div>
+              <div class="legend-block">
+                <h2>Angles</h2>
+                <div id="angleToggles" class="legend-grid"></div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Advanced Overlays -->
+        <details class="section">
+          <summary>Astro Overlays</summary>
+          <div class="section-body">
+            <div class="overlay-block">
+              <div class="overlay-title">Transit lines</div>
+              <div class="row-2">
+                <label>Transit date
+                  <input type="date" id="transitDate" value="2026-08-20" />
+                </label>
+                <label>Time
+                  <input type="time" id="transitTime" value="12:00" />
+                </label>
+              </div>
+              <button type="button" id="loadTransit" class="ghost-btn full">Load transit lines</button>
+              <label class="view-toggle">
+                <input type="checkbox" id="showTransit" />
+                Show transit lines
+              </label>
+            </div>
+
+            <div class="overlay-block">
+              <div class="overlay-title">Progressed lines</div>
+              <label class="view-toggle">
+                <input type="checkbox" id="progressedToggle" />
+                Show progressed (secondary)
+              </label>
+              <label>Age (years)
+                <input type="number" id="progressedAge" value="30" min="0" max="120" step="1" />
+              </label>
+            </div>
+
+            <div class="overlay-block">
+              <div class="overlay-title">Advanced charts</div>
+              <div class="overlay-btns">
+                <button type="button" id="ovGeodetic" class="overlay-btn" aria-pressed="false">Geodetic</button>
+                <button type="button" id="ovFixedStars" class="overlay-btn" aria-pressed="false">Fixed Stars</button>
+                <button type="button" id="ovMidpoints" class="overlay-btn" aria-pressed="false">Midpoints</button>
+                <button type="button" id="ovCrossings" class="overlay-btn" aria-pressed="false">Power Places</button>
+              </div>
+            </div>
+
+            <div class="overlay-block">
+              <div class="overlay-title">Returns</div>
+              <div class="row-2">
+                <label>Year
+                  <input type="number" id="returnYear" value="2026" min="1900" max="2100" step="1" />
+                </label>
+                <label>Month (lunar)
+                  <input type="number" id="returnMonth" value="" min="1" max="12" step="1" placeholder="—" />
+                </label>
+              </div>
+              <div class="overlay-btns">
+                <button type="button" id="ovSolarReturn" class="overlay-btn" aria-pressed="false">Solar Return</button>
+                <button type="button" id="ovLunarReturn" class="overlay-btn" aria-pressed="false">Lunar Return</button>
+              </div>
+            </div>
+          </div>
+        </details>
+      </aside>
+    </div>
+
+    <!-- Right side tabs wrapper -->
+    <aside id="rightPanel">
+      <div class="panel-tabs">
+        <button type="button" class="tab-btn active" id="tabIntel">Location Intel</button>
+        <button type="button" class="tab-btn" id="tabTopCities">Best Cities</button>
+        <button type="button" class="tab-btn" id="tabTravel">Travel Timing</button>
+      </div>
+
+      <div id="tabContentIntel" class="tab-content active">
+        <div id="report">
+          <p class="report-empty">Hover the globe or map to preview a place. Double-click to pin a full analysis.</p>
+        </div>
+      </div>
+
+      <div id="tabContentTopCities" class="tab-content">
+        <div class="cities-tab-header">
+          <div class="cities-tab-title">
+            <span class="cities-star">✦</span>
+            <span>Best Cities for You</span>
+          </div>
+          <p class="cities-tab-sub">Ranked by your birth chart energies. Choose a focus to rerank.</p>
+          <div class="cities-goal-strip" id="citiesGoalStrip">
+            <button class="cg-btn active" data-goal="all">🌐 All</button>
+            <button class="cg-btn" data-goal="love">❤️ Love</button>
+            <button class="cg-btn" data-goal="career">💼 Career</button>
+            <button class="cg-btn" data-goal="wealth">💰 Wealth</button>
+            <button class="cg-btn" data-goal="peace">🧘 Peace</button>
+            <button class="cg-btn" data-goal="growth">🚀 Growth</button>
+          </div>
+          <div class="city-weights" id="cityWeights">
+            <div class="city-weights-header">
+              <span>Fine-tune goals</span>
+              <button type="button" id="weightsReset" class="city-weights-reset">Reset</button>
+            </div>
+            <div class="city-weight-row"><label for="wLove">❤️ Love</label><input type="range" id="wLove" min="0" max="10" value="5" step="1"></div>
+            <div class="city-weight-row"><label for="wCareer">💼 Career</label><input type="range" id="wCareer" min="0" max="10" value="5" step="1"></div>
+            <div class="city-weight-row"><label for="wHome">🏠 Home</label><input type="range" id="wHome" min="0" max="10" value="5" step="1"></div>
+            <div class="city-weight-row"><label for="wPeace">🧘 Peace</label><input type="range" id="wPeace" min="0" max="10" value="5" step="1"></div>
+            <div class="city-weight-row"><label for="wGrowth">🚀 Growth</label><input type="range" id="wGrowth" min="0" max="10" value="5" step="1"></div>
+          </div>
+          <div class="city-compare">
+            <label for="compareSelect">💑 Compare with</label>
+            <select id="compareSelect">
+              <option value="">— nobody (solo ranking) —</option>
+            </select>
+          </div>
+        </div>
+        <div id="top-cities-list">
+          <div class="cities-empty">
+            <div class="cities-empty-icon">🌍</div>
+            <p class="cities-empty-title">Draw your chart first</p>
+            <p class="cities-empty-sub">Enter your birth data and click "Draw chart" — your personalised top cities will appear here.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabContentTravel" class="tab-content">
+        <div class="travel-tab-header">
+          <div class="cities-tab-title">
+            <span class="cities-star">✦</span>
+            <span>Travel Timing</span>
+          </div>
+          <p class="cities-tab-sub">Find the best days to arrive at your pinned destination.</p>
+          <div class="row-2">
+            <label>Start date
+              <input type="date" id="travelStart" />
+            </label>
+            <label>Days
+              <input type="number" id="travelDays" value="30" min="7" max="90" step="1" />
+            </label>
+          </div>
+          <button type="button" id="loadTravelTiming" class="ghost-btn full">Calculate travel window</button>
+        </div>
+        <div id="travelTimingList">
+          <p class="report-empty">Pin a destination on the globe, then calculate your travel window.</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Floating Dock Controls (bottom-center) -->
+    <div id="floatingDock">
+      <button class="dock-btn mode-btn" id="ctrlViewMode" title="Toggle 2D/3D View">
+        🌐 <span id="viewModeLabel">2D Map</span>
+      </button>
+      <div class="dock-divider"></div>
+      <button class="dock-btn" id="ctrlPin" title="Drop a pin here">📌 Pin</button>
+      <button class="dock-btn" id="ctrlReset" title="Reset camera view">⤢ Reset</button>
+      <button class="dock-btn" id="ctrlGraticule" title="Toggle grid lines" aria-pressed="false">▦ Grid</button>
+      <button class="dock-btn" id="ctrlCrosshair" title="Toggle crosshair" aria-pressed="false">⊕ Crosshair</button>
+      <button class="dock-btn" id="ctrlRotate" title="Toggle rotation" aria-pressed="false">↻ Rotate</button>
+      <button class="dock-btn" id="ctrlFullscreen" title="Toggle fullscreen (Esc to exit)" aria-pressed="false">⛶ Fullscreen</button>
+      <div class="dock-divider"></div>
+      <button class="dock-btn zoom-btn" id="zoomOut" title="Zoom out">−</button>
+      <span class="zoom-pct" id="zoomPct" title="Zoom level">100%</span>
+      <button class="dock-btn zoom-btn" id="zoomIn" title="Zoom in">+</button>
+    </div>
+
+    <div id="crosshair" data-visible="false" aria-hidden="true">
+      <div class="ch-h"></div>
+      <div class="ch-v"></div>
+    </div>
+
+    <div id="loader">
+      <div class="loader-box">
+        <div class="loader-orbit"></div>
+        <div class="loader-title">Charting your sky…</div>
+        <div class="loader-track"><div id="loaderBar" class="loader-fill"></div></div>
+        <div id="loaderPct" class="loader-pct">0%</div>
+      </div>
+    </div>
+
+    <div id="printReportContainer"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

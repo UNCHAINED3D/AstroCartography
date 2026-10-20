@@ -1,0 +1,21 @@
+{
+  "name": "astrocartography-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/copy-cesium.mjs && tsc && vite build",
+    "preview": "vite preview --host",
+    "postinstall": "node scripts/copy-cesium.mjs"
+  },
+  "dependencies": {
+    "@types/leaflet": "^1.9.22",
+    "cesium": "^1.120.0",
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1"
+  }
+}

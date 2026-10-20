@@ -1,0 +1,12 @@
+node_modules/
+frontend/dist/
+dist/
+build/
+__pycache__/
+*.pyc
+backend/__pycache__/
+backend/api/__pycache__/
+backend/births.db
+.kernels/
+*.spec
+.env
