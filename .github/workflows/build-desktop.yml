@@ -36,7 +36,7 @@ jobs:
 
       - name: Download de440 kernel
         run: |
-          python -c "import os, urllib.request; d=os.path.expanduser('~/.moira/kernels'); os.makedirs(d, exist_ok=True); p=os.path.join(d,'de440.bsp'); urllib.request.urlretrieve('https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp', p) if not os.path.exists(p) else None; print('kernel ready:', os.path.exists(p), os.path.getsize(p) if os.path.exists(p) else 0)"
+          python -c "import os, urllib.request; d='kernels'; os.makedirs(d, exist_ok=True); p=os.path.join(d,'de440.bsp'); urllib.request.urlretrieve('https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp', p) if not os.path.exists(p) else None; print('kernel ready:', os.path.exists(p), os.path.getsize(p) if os.path.exists(p) else 0)"
 
       - name: Build app (Windows)
         if: runner.os == 'Windows'
@@ -44,7 +44,7 @@ jobs:
           python -m PyInstaller --noconfirm --windowed --name Astrocartography --paths backend `
             --add-data "frontend/dist;frontend/dist" `
             --add-data "backend/data;backend/data" `
-            --add-data "${{ runner.home }}/.moira/kernels;kernels" `
+            --add-data "kernels;kernels" `
             --collect-all moira --collect-all uvicorn --collect-all fastapi --collect-all starlette --collect-all pydantic `
             --hidden-import uvicorn.logging --hidden-import uvicorn.loops --hidden-import uvicorn.loops.auto `
             --hidden-import uvicorn.protocols --hidden-import uvicorn.protocols.http --hidden-import uvicorn.protocols.http.auto `
@@ -57,7 +57,7 @@ jobs:
           python -m PyInstaller --noconfirm --windowed --name Astrocartography --paths backend \
             --add-data "frontend/dist:frontend/dist" \
             --add-data "backend/data:backend/data" \
-            --add-data "${HOME}/.moira/kernels:kernels" \
+            --add-data "kernels:kernels" \
             --collect-all moira --collect-all uvicorn --collect-all fastapi --collect-all starlette --collect-all pydantic \
             --hidden-import uvicorn.logging --hidden-import uvicorn.loops --hidden-import uvicorn.loops.auto \
             --hidden-import uvicorn.protocols --hidden-import uvicorn.protocols.http --hidden-import uvicorn.protocols.http.auto \

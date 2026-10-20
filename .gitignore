@@ -9,4 +9,5 @@ backend/api/__pycache__/
 backend/births.db
 .kernels/
 *.spec
-.env
+kernels/
+
