@@ -34,8 +34,9 @@ jobs:
         working-directory: frontend
         run: npm install && npm run build
 
-      - name: Download Moira kernel
-        run: python -m moira.download_kernels --yes
+      - name: Download de440 kernel
+        run: |
+          python -c "import os, urllib.request; d=os.path.expanduser('~/.moira/kernels'); os.makedirs(d, exist_ok=True); p=os.path.join(d,'de440.bsp'); urllib.request.urlretrieve('https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp', p) if not os.path.exists(p) else None; print('kernel ready:', os.path.exists(p), os.path.getsize(p) if os.path.exists(p) else 0)"
 
       - name: Build app (Windows)
         if: runner.os == 'Windows'
