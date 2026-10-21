@@ -242,6 +242,7 @@ export function initMap2D(container: HTMLElement): Map2DHandle {
       map.setView([20, 0], 2);
     },
     focusLocation: (lat: number, lng: number, zoom: number = 6) => {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       map.flyTo([lat, lng], zoom, { duration: 1.5 });
     },
     setClickHandler: (cb) => {

@@ -912,6 +912,7 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
       autoRotate = on;
     },
     focusBirth(lat: number, lng: number) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       flyTo(lat, lng, 3e6, 1000);
     },
     resetView() {
