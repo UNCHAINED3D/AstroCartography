@@ -1,4 +1,4 @@
-import type { ACGRequest, ACGResponse, BirthEntry, LocationAnalysis, TopCity, OverlayResponse, TransitRequest, ProgressedRequest, GeodeticRequest, FixedStarsRequest, MidpointsRequest, CrossingResponse, TravelDay } from './types';
+import type { ACGRequest, ACGResponse, BirthEntry, LocationAnalysis, TopCity, OverlayResponse, TransitRequest, ProgressedRequest, GeodeticRequest, FixedStarsRequest, MidpointsRequest, CrossingResponse, TravelDay, TravelTimingRequest, GroupTravelDay, TripPlanRequest, TripPlanResponse } from './types';
 
 const API_BASE = '/api';
 
@@ -80,11 +80,21 @@ export async function fetchTopCities(
   limit: number = 15,
   weights?: Record<string, number>,
   secondBirth?: { datetime: string; latitude: number; longitude: number },
+  births?: { datetime: string; latitude: number; longitude: number }[],
+  region?: string,
+  center?: { lat: number; lon: number; radius_km: number },
+  bbox?: [[number, number], [number, number]],
+  maxDistanceKm?: number,
+  grid?: boolean,
 ): Promise<TopCity[]> {
   const res = await fetch(`${API_BASE}/top-cities`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ birth, focus, limit, weights, second_birth: secondBirth }),
+    body: JSON.stringify({
+      birth, focus, limit, weights, second_birth: secondBirth, births,
+      region, center_lat: center?.lat, center_lon: center?.lon, radius_km: center?.radius_km,
+      bbox, max_distance_from_birth_km: maxDistanceKm, grid,
+    }),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -152,7 +162,7 @@ export async function fetchLunarReturn(req: { birth: { datetime: string; latitud
   return postOverlay('/lunar-return', req);
 }
 
-export async function fetchTravelTiming(req: { birth: { datetime: string; latitude: number; longitude: number }; dest_lat: number; dest_lon: number; start_date: string; days: number }): Promise<TravelDay[]> {
+export async function fetchTravelTiming(req: TravelTimingRequest): Promise<TravelDay[]> {
   const res = await fetch(`${API_BASE}/travel-timing`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -166,6 +176,36 @@ export async function fetchTravelTiming(req: { birth: { datetime: string; latitu
     } catch { /* ignore */ }
     throw new Error(detail);
   }
+  return res.json();
+}
+
+export async function fetchGroupTravelTiming(req: {
+  births: { datetime: string; latitude: number; longitude: number }[];
+  dest_lat: number;
+  dest_lon: number;
+  start_date: string;
+  days: number;
+  hour_step?: number;
+  stay_days?: number;
+  include_warnings?: boolean;
+  combine?: string;
+}): Promise<GroupTravelDay[]> {
+  const res = await fetch(`${API_BASE}/group-travel-timing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchTripPlan(req: TripPlanRequest): Promise<TripPlanResponse> {
+  const res = await fetch(`${API_BASE}/trip-plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 

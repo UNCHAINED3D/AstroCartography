@@ -32,7 +32,7 @@ from electional import rate_travel_window
 from returns import generate_solar_return_acg, generate_lunar_return_acg
 
 from cache import cached, payload_key
-from cities import rank_cities_for_birth, rank_cities_for_couple
+from cities import rank_cities_for_birth, rank_cities_for_couple, rank_cities_for_group, rank_grid_in_area
 from births import (
     create_entry,
     list_entries,
@@ -145,13 +145,17 @@ class TopCitiesRequest(BaseModel):
     birth: Birth
     focus: str = "all"  # love, career, wealth, peace, growth, all
     limit: int = 15
-    # Per-domain goal weights from the UI sliders (0–10 each). When provided,
-    # they blend with (and override) the focus preset's emphasis.
     weights: Optional[dict[str, float]] = None
     include_breakdown: bool = True
-    # Dual-chart mode: when set, cities are ranked for the couple and the
-    # partner's lines can be overlaid on the globe.
     second_birth: Optional[Birth] = None
+    births: Optional[list[Birth]] = None  # group mode
+    region: Optional[str] = None
+    center_lat: Optional[float] = None
+    center_lon: Optional[float] = None
+    radius_km: Optional[float] = None
+    bbox: Optional[list] = None
+    max_distance_from_birth_km: Optional[float] = None
+    grid: bool = False
 
 
 class ReturnRequest(BaseModel):
@@ -166,8 +170,37 @@ class TravelTimingRequest(BaseModel):
     birth: Birth
     dest_lat: float
     dest_lon: float
-    start_date: str          # ISO date "YYYY-MM-DD" (UTC assumed)
+    start_date: str          # ISO date or datetime
     days: int = 30
+    hour_step: int = 4
+    stay_days: int = 3
+    include_warnings: bool = True
+
+class GroupTravelTimingRequest(BaseModel):
+    births: list[Birth]
+    dest_lat: float
+    dest_lon: float
+    start_date: str
+    days: int = 30
+    hour_step: int = 4
+    stay_days: int = 3
+    include_warnings: bool = True
+    combine: str = "min"  # min | avg | consensus
+
+class TripStop(BaseModel):
+    latitude: float
+    longitude: float
+    name: Optional[str] = None
+    min_days: int = 2
+    max_days: int = 5
+    flex_start: str  # ISO date
+    flex_end: str    # ISO date
+
+class TripPlanRequest(BaseModel):
+    birth: Birth
+    stops: list[TripStop]
+    total_days: int = 21
+    hour_step: int = 4
 
 
 
@@ -361,22 +394,66 @@ def lunar_return(req: ReturnRequest) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Lunar return error: {exc}")
 
 
-@app.post("/api/travel-timing")
-def travel_timing(req: TravelTimingRequest) -> list[dict[str, Any]]:
-    """Score each day in a window for travel favourability to a destination."""
+@app.post("/api/group-travel-timing")
+def group_travel_timing(req: GroupTravelTimingRequest) -> list[dict[str, Any]]:
+    """Score each day for a group of births; combine per `combine` mode."""
+    if not req.births:
+        raise HTTPException(status_code=400, detail="births must not be empty")
     key = payload_key(
-        "travel-timing", req.birth.datetime, req.birth.latitude, req.birth.longitude,
-        req.dest_lat, req.dest_lon, req.start_date, req.days,
+        "group-travel-timing", [(b.datetime, b.latitude, b.longitude) for b in req.births],
+        req.dest_lat, req.dest_lon, req.start_date, req.days, req.combine,
     )
     try:
-        return cached(key, lambda: rate_travel_window(
-            req.birth.datetime, req.birth.latitude, req.birth.longitude,
-            req.dest_lat, req.dest_lon, req.start_date, days=req.days,
-        ))
+        def _run():
+            per_person_days = []
+            for b in req.births:
+                per_person_days.append(rate_travel_window(
+                    b.datetime, b.latitude, b.longitude,
+                    req.dest_lat, req.dest_lon, req.start_date, days=req.days,
+                    hour_step=req.hour_step, stay_days=req.stay_days,
+                    include_warnings=req.include_warnings,
+                ))
+            # combine
+            out = []
+            n_days = req.days
+            for i in range(n_days):
+                scores = [pp[i]['score'] for pp in per_person_days]
+                if req.combine == 'avg':
+                    combined = sum(scores) / len(scores)
+                elif req.combine == 'consensus':
+                    # mean of top-half? use mean but penalize spread
+                    mean = sum(scores) / len(scores)
+                    spread = max(scores) - min(scores)
+                    combined = mean - spread * 0.25
+                else:  # min
+                    combined = min(scores)
+                combined = max(0.0, min(100.0, combined))
+                out.append({
+                    'date': per_person_days[0][i]['date'],
+                    'combined_score': round(combined, 1),
+                    'per_person': [
+                        {'index': j, 'score': per_person_days[j][i]['score'],
+                         'influences': per_person_days[j][i]['influences'],
+                         'warnings': per_person_days[j][i]['warnings']}
+                        for j in range(len(req.births))
+                    ],
+                })
+            return out
+        return cached(key, _run)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc) or "Invalid request")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Travel timing error: {exc}")
+        raise HTTPException(status_code=500, detail=f"Group travel timing error: {exc}")
+
+
+@app.post("/api/trip-plan")
+def trip_plan(req: TripPlanRequest) -> dict[str, Any]:
+    """Optimize a multi-stop trip for best timing."""
+    try:
+        from trip_planner import plan_trip
+        return plan_trip(req)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Trip plan error: {exc}")
 
 
 
@@ -407,10 +484,30 @@ def location_analysis(req: LocationAnalysisRequest) -> dict[str, Any]:
 def top_cities(req: TopCitiesRequest) -> list[dict[str, Any]]:
     key = payload_key(
         "top-cities", req.birth.datetime, req.birth.latitude, req.birth.longitude,
-        req.focus, req.limit, req.weights, req.second_birth,
+        req.focus, req.limit, req.weights, req.second_birth, req.births,
+        req.region, req.center_lat, req.center_lon, req.radius_km, req.bbox,
+        req.max_distance_from_birth_km, req.grid,
     )
     try:
         def _rank():
+            spatial = dict(region=req.region, center_lat=req.center_lat,
+                           center_lon=req.center_lon, radius_km=req.radius_km,
+                           bbox=req.bbox, max_distance_from_birth_km=req.max_distance_from_birth_km)
+            if req.grid:
+                return rank_grid_in_area(
+                    req.birth.datetime, req.birth.latitude, req.birth.longitude,
+                    focus=req.focus, limit=req.limit, weights=req.weights,
+                    bbox=req.bbox, center_lat=req.center_lat, center_lon=req.center_lon,
+                    radius_km=req.radius_km, step_deg=1.0,
+                )
+            if req.births:
+                births = [{"datetime": b.datetime, "latitude": b.latitude, "longitude": b.longitude} for b in req.births]
+                # include primary birth too
+                births = [{"datetime": req.birth.datetime, "latitude": req.birth.latitude, "longitude": req.birth.longitude}] + births
+                return rank_cities_for_group(
+                    births, focus=req.focus, limit=req.limit, weights=req.weights,
+                    combine="avg", **{k: v for k, v in spatial.items() if k in ("region", "center_lat", "center_lon", "radius_km")},
+                )
             if req.second_birth is not None:
                 return rank_cities_for_couple(
                     req.birth.datetime, req.birth.latitude, req.birth.longitude,
@@ -419,13 +516,9 @@ def top_cities(req: TopCitiesRequest) -> list[dict[str, Any]]:
                     focus=req.focus, limit=req.limit, weights=req.weights,
                 )
             return rank_cities_for_birth(
-                req.birth.datetime,
-                req.birth.latitude,
-                req.birth.longitude,
-                focus=req.focus,
-                limit=req.limit,
-                weights=req.weights,
-                include_breakdown=req.include_breakdown,
+                req.birth.datetime, req.birth.latitude, req.birth.longitude,
+                focus=req.focus, limit=req.limit, weights=req.weights,
+                include_breakdown=req.include_breakdown, **spatial,
             )
         return cached(key, _rank)
     except ValueError as exc:

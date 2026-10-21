@@ -605,16 +605,21 @@ export function renderTravelDays(
   // Best day highlight
   const best = days.reduce((a, b) => (b.score > a.score ? b : a), days[0]);
   const bestCard = el('div', 'travel-best-day');
-  bestCard.innerHTML = `
-    <div class="travel-best-label">✨ Best day</div>
-    <div class="travel-best-date">${best.date}</div>
-    <div class="travel-best-score" style="background:${scoreColor(best.score)}">${best.score.toFixed(0)}</div>
-  `;
-  if (best.influences?.length) {
-    const inf = el('div', 'travel-best-inf');
-    best.influences.forEach((i) => inf.appendChild(el('div', 'travel-inf-line', i)));
-    bestCard.appendChild(inf);
-  }
+   bestCard.innerHTML = `
+     <div class="travel-best-label">✨ Best day</div>
+     <div class="travel-best-date">${best.date}${best.best_hour != null ? ` · best around ${best.best_hour}:00` : ''}</div>
+     <div class="travel-best-score" style="background:${scoreColor(best.score)}">${best.score.toFixed(0)}</div>
+   `;
+   if (best.influences?.length) {
+     const inf = el('div', 'travel-best-inf');
+     best.influences.forEach((i) => inf.appendChild(el('div', 'travel-inf-line', i)));
+     bestCard.appendChild(inf);
+   }
+   if (best.warnings?.length) {
+     const w = el('div', 'travel-best-inf');
+     best.warnings.forEach((i) => w.appendChild(el('div', 'travel-inf-line', `⚠ ${i}`)));
+     bestCard.appendChild(w);
+   }
   container.appendChild(bestCard);
 
   // Score strip

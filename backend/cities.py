@@ -189,6 +189,12 @@ def rank_cities_for_birth(
     limit: int = 15,
     weights: dict[str, float] | None = None,
     include_breakdown: bool = True,
+    region: str | None = None,
+    center_lat: float | None = None,
+    center_lon: float | None = None,
+    radius_km: float | None = None,
+    bbox: list | None = None,
+    max_distance_from_birth_km: float | None = None,
 ) -> list[dict[str, Any]]:
     """Rank global cities for a birth chart.
 
@@ -218,6 +224,26 @@ def rank_cities_for_birth(
     parans = acg.get("parans", [])
 
     # Relocated chart per city: built once, reused for all house scoring.
+    # Compute filtered city list first so relocated charts only built for candidates.
+    _all_cities = load_world_cities()
+    filtered_cities = []
+    for _c in _all_cities:
+        if region and str(_c.get("region", "")).lower() != region.lower():
+            continue
+        _clat = _c["lat"]; _clng = _c["lng"]
+        if center_lat is not None and center_lon is not None and radius_km is not None:
+            if geometry.haversine_km(center_lat, center_lon, _clat, _clng) > radius_km:
+                continue
+        if bbox and len(bbox) == 2:
+            (la1, lo1), (la2, lo2) = bbox
+            if not (min(la1, la2) <= _clat <= max(la1, la2) and min(lo1, lo2) <= _clng <= max(lo1, lo2)):
+                continue
+        if max_distance_from_birth_km is not None:
+            if geometry.haversine_km(birth_lat, birth_lon, _clat, _clng) > max_distance_from_birth_km:
+                continue
+        filtered_cities.append(_c)
+    cities = filtered_cities if filtered_cities else _all_cities
+
     relocated: dict[str, dict[str, Any]] = {}
     try:
         from moira.chart import create_chart
@@ -225,7 +251,7 @@ def rank_cities_for_birth(
 
         jd_ut = jd_from_iso(iso_datetime)
         with moira_reader():
-            for city in load_world_cities():
+            for city in cities:
                 try:
                     chart = create_chart(jd_ut, city["lat"], city["lng"])
                     houses = chart.houses
@@ -254,8 +280,7 @@ def rank_cities_for_birth(
         return preset_weights.get(key, 2.0 if focus_key == "all" else 0.5)
 
     results: list[dict[str, Any]] = []
-    cities = load_world_cities()
-
+    # cities already filtered above
     for city in cities:
         clat = city["lat"]
         clng = city["lng"]
@@ -457,5 +482,153 @@ def rank_cities_for_couple(
             "summary": summary,
         })
 
+    results.sort(key=lambda c: c["overall_score"], reverse=True)
+    return results[:limit]
+
+
+# --------------------------------------------------------------------------- #
+# Group + grid helpers
+# --------------------------------------------------------------------------- #
+
+
+def rank_cities_for_group(
+    births, focus="all", limit=15, weights=None, combine="avg",
+    region=None, center_lat=None, center_lon=None, radius_km=None,
+):
+    full = len(load_world_cities())
+    ranks_per = []
+    for b in births:
+        ranks_per.append(rank_cities_for_birth(
+            b["datetime"], b["latitude"], b["longitude"],
+            focus=focus, limit=full, weights=weights,
+            region=region, center_lat=center_lat, center_lon=center_lon, radius_km=radius_km,
+        ))
+    by_name_sets = [{c["name"]: c for c in r} for r in ranks_per]
+    names = list(by_name_sets[0].keys()) if by_name_sets else []
+    results = []
+    for name in names:
+        if not all(name in bs for bs in by_name_sets):
+            continue
+        per = [bs[name] for bs in by_name_sets]
+        scores = [p["overall_score"] for p in per]
+        if combine == "min":
+            combined = min(scores)
+        elif combine == "consensus":
+            mean = sum(scores) / len(scores)
+            spread = max(scores) - min(scores)
+            combined = mean - spread * 0.25
+        else:
+            combined = sum(scores) / len(scores)
+        benefic_count = sum(
+            1 for p in per
+            if any(i["planet"] in {"Venus", "Moon", "Jupiter", "Sun"}
+                   for i in p.get("primary_influences", []))
+        )
+        bonus = 6.0 if benefic_count >= 2 else 0.0
+        penalty = 0.0
+        for p in per:
+            if any(i["planet"] in {"Saturn", "Mars", "Pluto"}
+                   for i in p.get("primary_influences", [])):
+                penalty += 3.0
+        combined = combined + bonus - penalty
+        combined = min(99, max(45, round(combined)))
+        influences = []
+        for j, p in enumerate(per):
+            for inf in p.get("primary_influences", []):
+                tagged = dict(inf)
+                tagged["person_index"] = j
+                influences.append(tagged)
+        influences.sort(key=lambda x: x["distance_km"])
+        influences = influences[:4]
+        best = influences[0] if influences else None
+        summary = (
+            f"Shared {best['planet']} {best['angle']} energy within {best['distance_km']} km."
+            if best else "Balanced energies for the group."
+        )
+        if bonus:
+            summary += " Benefic lines overlap for multiple members."
+        c0 = per[0]
+        result = {
+            "name": c0["name"],
+            "country": c0["country"],
+            "region": c0["region"],
+            "latitude": c0["latitude"],
+            "longitude": c0["longitude"],
+            "overall_score": combined,
+            "scores": {
+                "love": round(sum(p["scores"]["love"] for p in per) / len(per)),
+                "career": round(sum(p["scores"]["career"] for p in per) / len(per)),
+                "peace": round(sum(p["scores"]["peace"] for p in per) / len(per)),
+                "growth": round(sum(p["scores"]["growth"] for p in per) / len(per)),
+            },
+            "primary_influences": influences,
+            "summary": summary,
+        }
+        results.append(result)
+    results.sort(key=lambda c: c["overall_score"], reverse=True)
+    return results[:limit]
+
+
+def rank_grid_in_area(
+    iso_datetime, birth_lat, birth_lon, focus="all", bbox=None,
+    center_lat=None, center_lon=None, radius_km=None, step_deg=1.0,
+    limit=15, weights=None,
+):
+    if center_lat is not None and center_lon is not None and radius_km is not None:
+        deg = radius_km / 111.0
+        la_min, la_max = center_lat - deg, center_lat + deg
+        lo_min, lo_max = center_lon - deg, center_lon + deg
+    elif bbox and len(bbox) == 2:
+        (la1, lo1), (la2, lo2) = bbox
+        la_min, la_max = min(la1, la2), max(la1, la2)
+        lo_min, lo_max = min(lo1, lo2), max(lo1, lo2)
+    else:
+        return []
+    points = []
+    la = la_min
+    while la <= la_max:
+        lo = lo_min
+        while lo <= lo_max:
+            if center_lat is not None and radius_km is not None:
+                if geometry.haversine_km(center_lat, center_lon, la, lo) > radius_km:
+                    lo += step_deg
+                    continue
+            points.append((la, lo))
+            lo += step_deg
+        la += step_deg
+    points = points[:400]
+    from acg import generate_acg
+    acg = generate_acg(iso_datetime, birth_lat, birth_lon, lat_step=1.0)
+    lines = acg.get("lines", [])
+    results = []
+    for (la, lo) in points:
+        acg_points = 0.0
+        nearby = []
+        for line in lines:
+            planet = line.get("planet", "")
+            angle = line.get("angle", "")
+            coords = line.get("geometry", {}).get("coordinates", [])
+            best = float("inf")
+            for pt in coords:
+                if len(pt) >= 2:
+                    d = geometry.haversine_km(la, lo, pt[1], pt[0])
+                    if d < best:
+                        best = d
+            if best <= 750.0:
+                prox = (1.0 - best / 750.0) ** 1.5
+                acg_points += 4.5 * 2.0 * prox
+                nearby.append({"planet": planet, "angle": angle, "distance_km": round(best)})
+        score = min(99, max(45, round(45 + acg_points)))
+        results.append({
+            "name": f"Grid {la:.2f},{lo:.2f}",
+            "country": "",
+            "region": "grid",
+            "latitude": la,
+            "longitude": lo,
+            "overall_score": score,
+            "scores": {"love": score, "career": score, "peace": score, "growth": score},
+            "primary_influences": nearby[:3],
+            "summary": "Grid-sampled location.",
+        })
     results.sort(key=lambda c: c["overall_score"], reverse=True)
     return results[:limit]

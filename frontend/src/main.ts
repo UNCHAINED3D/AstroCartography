@@ -128,16 +128,9 @@ document.querySelectorAll<HTMLInputElement>('.city-weight-row input[type="range"
   });
 });
 
-$('weightsReset')?.addEventListener('click', () => {
-  document.querySelectorAll<HTMLInputElement>('.city-weight-row input[type="range"]').forEach((inp) => {
-    inp.value = '5';
-  });
-  if (weightsDirty) {
-    weightsDirty = false;
-    void loadTopCities();
-  }
-});
+$('regionSelect')?.addEventListener('change', () => { void loadTopCities(); });
 
+$('regionSelect')?.addEventListener('change', () => { void loadTopCities(); });
 
 function applyGoalFilter(goal: string) {
   const goalPlanets: Record<string, string[]> = {
@@ -410,6 +403,8 @@ async function loadTopCities(): Promise<void> {
       compareBirth
         ? { datetime: compareBirth.datetime, latitude: compareBirth.latitude, longitude: compareBirth.longitude }
         : undefined,
+      undefined,
+      ($('regionSelect') as HTMLSelectElement | null)?.value || undefined,
     );
     lastTopCities = cities;
     renderTopCitiesCards(cities, (city: TopCity) => {

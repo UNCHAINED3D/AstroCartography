@@ -223,10 +223,13 @@ export interface TravelDay {
   date: string;
   score: number;
   influences: string[];
+  best_hour?: number;
+  hourly?: { hour: number; score: number }[];
+  arrival_score?: number;
+  stay_score?: number;
+  departure_score?: number | null;
+  warnings?: string[];
 }
-
-// Travel timing response is just a list of days
-export type TravelTimingDay = TravelDay;
 
 export interface TravelTimingRequest {
   birth: { datetime: string; latitude: number; longitude: number };
@@ -234,9 +237,48 @@ export interface TravelTimingRequest {
   dest_lon: number;
   start_date: string;
   days: number;
+  hour_step?: number;
+  stay_days?: number;
+  include_warnings?: boolean;
 }
 
-export type TravelTimingResponse = TravelTimingDay[];
+export interface GroupTravelDay {
+  date: string;
+  combined_score: number;
+  per_person: { index: number; score: number; influences: string[]; warnings: string[] }[];
+}
+
+export interface TripStop {
+  latitude: number;
+  longitude: number;
+  name?: string;
+  min_days?: number;
+  max_days?: number;
+  flex_start: string;
+  flex_end: string;
+}
+
+export interface TripPlanRequest {
+  birth: { datetime: string; latitude: number; longitude: number };
+  stops: TripStop[];
+  total_days?: number;
+  hour_step?: number;
+}
+
+export interface TripPlanResponse {
+  total_score: number;
+  itinerary: {
+    name: string;
+    latitude: number;
+    longitude: number;
+    arrival_date: string;
+    length_days: number;
+    score: number;
+    daily: { date: string; score: number }[];
+  }[];
+}
+
+export type TravelTimingDay = TravelDay;
 
 export interface SolarReturnRequest {
   birth: { datetime: string; latitude: number; longitude: number };
