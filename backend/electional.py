@@ -72,9 +72,15 @@ def _house_of(longitude: float, cusps: tuple[float, ...]) -> int:
     return n
 
 
-def _chart_planets(jd_ut: float, lat: float, lon: float, reader: Any = None) -> dict[str, Any]:
+TRAVEL_BODIES: list[str] = [
+    "Sun", "Moon", "Mercury", "Venus", "Mars",
+    "Jupiter", "Saturn", "Pluto",
+]
+
+
+def _chart_planets(jd_ut: float, lat: float, lon: float, reader: Any = None, bodies: list[str] | None = None) -> dict[str, Any]:
     """Return (planet longitudes dict, chart) for a moment/location."""
-    chart = create_chart(jd_ut, lat, lon, bodies=list(BODIES), reader=reader)
+    chart = create_chart(jd_ut, lat, lon, bodies=list(bodies or BODIES), reader=reader)
     return {name: pd for name, pd in chart.planets.items()}, chart
 
 
@@ -110,7 +116,7 @@ def _classify_aspect(a: float, b: float):
 def _natal_longitudes(birth_iso: str, birth_lat: float, birth_lon: float) -> dict[str, float]:
     jd = _iso_to_jd(birth_iso)
     with moira_reader():
-        planets, _ = _chart_planets(jd, birth_lat, birth_lon)
+        planets, _ = _chart_planets(jd, birth_lat, birth_lon, bodies=TRAVEL_BODIES)
     return {name: pd.longitude for name, pd in planets.items()}
 
 
@@ -122,7 +128,7 @@ def _score_hour(
     reader: Any,
 ) -> tuple[float, list[str], list[str]]:
     """Return (score, influences, warnings) for a single hour sample."""
-    planets, chart = _chart_planets(jd_hour, dest_lat, dest_lon, reader=reader)
+    planets, chart = _chart_planets(jd_hour, dest_lat, dest_lon, reader=reader, bodies=TRAVEL_BODIES)
     transits = {name: pd.longitude for name, pd in planets.items()}
     # retrograde map
     retro = {name: bool(pd.retrograde) for name, pd in planets.items()}
@@ -224,7 +230,7 @@ def _score_hour(
         warnings.append('Mercury retrograde')
 
     # 6. Eclipse season
-    node_lon = _south_node_lon(jd_hour, reader=reader)  # ascending = +180
+    node_lon = sn  # ascending = +180 (reuses value from step 3)
     asc_node = (node_lon + 180.0) % 360.0
     if _angular_distance(sun_lon, asc_node) <= 5.0 or _angular_distance(sun_lon, node_lon) <= 5.0:
         warnings.append('Eclipse season (Sun near node)')
@@ -253,7 +259,7 @@ def rate_travel_window(
     dest_lon: float,
     start_date: str,
     days: int = 30,
-    hour_step: int = 4,
+    hour_step: int = 8,
     stay_days: int = 3,
     include_warnings: bool = True,
 ) -> list[dict[str, Any]]:

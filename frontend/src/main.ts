@@ -63,6 +63,7 @@ viewModeBtn?.addEventListener('click', () => {
 
 // Pin mode toggle
 let pinMode = false;
+let pickingBirthplace = false;
 const ctrlPin = $('ctrlPin') as HTMLButtonElement | null;
 ctrlPin?.addEventListener('click', () => {
   pinMode = !pinMode;
@@ -474,6 +475,20 @@ map2d.setPinClickHandler((id: string) => selectPin(id));
 globe.setPinClickHandler((id: string) => selectPin(id));
 
 function handleMapClick(info: ClickInfo) {
+  if (pickingBirthplace) {
+    ($('lat') as HTMLInputElement).value = info.lat.toFixed(4);
+    ($('lng') as HTMLInputElement).value = info.lng.toFixed(4);
+    citySearch.value = '';
+    pickingBirthplace = false;
+    const btn = $('pickBirthplace') as HTMLButtonElement | null;
+    btn?.classList.remove('pin-active');
+    globe.setPinMode(false);
+    map2d.setPinMode(false);
+    globe.setCursor('grab');
+    map2d.setCursor('');
+    setStatus(`Birthplace set to ${info.lat.toFixed(4)}, ${info.lng.toFixed(4)}.`);
+    return;
+  }
   const b = currentBirth();
   if (!b) {
     setStatus('Enter a birth date and location first.', true);
@@ -629,6 +644,23 @@ $('useLocation').addEventListener('click', () => {
     { enableHighAccuracy: false, timeout: 10000 },
   );
 });
+$('pickBirthplace')?.addEventListener('click', () => {
+  pickingBirthplace = !pickingBirthplace;
+  const btn = $('pickBirthplace') as HTMLButtonElement | null;
+  btn?.classList.toggle('pin-active', pickingBirthplace);
+  if (pickingBirthplace) {
+    globe.setPinMode(true);
+    map2d.setPinMode(true);
+    globe.setCursor('crosshair');
+    map2d.setCursor('crosshair');
+    setStatus('Click on the map to set birthplace…');
+  } else {
+    globe.setPinMode(false);
+    map2d.setPinMode(false);
+    globe.setCursor('grab');
+    map2d.setCursor('');
+  }
+});
 
 function setStatus(msg: string, isError = false) {
   const el = $('status');
@@ -734,6 +766,7 @@ async function loadTravelTiming(): Promise<void> {
   if (container) {
     container.innerHTML = '<div class="travel-loading">Calculating…</div>';
   }
+  showLoader();
   try {
     const results = await fetchTravelTiming({
       birth: b,
@@ -748,6 +781,8 @@ async function loadTravelTiming(): Promise<void> {
     if (container) {
       container.innerHTML = `<p class="report-empty error">Travel timing error: ${(err as Error).message}</p>`;
     }
+  } finally {
+    hideLoader();
   }
 }
 
@@ -1169,6 +1204,7 @@ async function drawCurrentBirth(): Promise<void> {
   }
 
   setStatus('Calculating…');
+  showLoader();
   try {
     const data = await fetchACG({
       birth: { datetime: birth.datetime, latitude: birth.latitude, longitude: birth.longitude },
@@ -1189,7 +1225,7 @@ async function drawCurrentBirth(): Promise<void> {
     setStatus(`Error: ${(err as Error).message}`, true);
   }
   renderPins();
-  if (!booted) { booted = true; hideLoader(); }
+  if (!booted) { booted = true; hideLoader(); } else { hideLoader(); }
 }
 
 $('birthForm').addEventListener('submit', async (e) => {

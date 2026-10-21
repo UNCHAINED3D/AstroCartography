@@ -172,7 +172,7 @@ class TravelTimingRequest(BaseModel):
     dest_lon: float
     start_date: str          # ISO date or datetime
     days: int = 30
-    hour_step: int = 4
+    hour_step: int = 8
     stay_days: int = 3
     include_warnings: bool = True
 
@@ -182,7 +182,7 @@ class GroupTravelTimingRequest(BaseModel):
     dest_lon: float
     start_date: str
     days: int = 30
-    hour_step: int = 4
+    hour_step: int = 8
     stay_days: int = 3
     include_warnings: bool = True
     combine: str = "min"  # min | avg | consensus
@@ -200,7 +200,7 @@ class TripPlanRequest(BaseModel):
     birth: Birth
     stops: list[TripStop]
     total_days: int = 21
-    hour_step: int = 4
+    hour_step: int = 8
 
 
 
