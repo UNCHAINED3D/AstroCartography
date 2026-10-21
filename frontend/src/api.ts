@@ -163,20 +163,30 @@ export async function fetchLunarReturn(req: { birth: { datetime: string; latitud
 }
 
 export async function fetchTravelTiming(req: TravelTimingRequest): Promise<TravelDay[]> {
-  const res = await fetch(`${API_BASE}/travel-timing`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data?.detail) detail = data.detail;
-    } catch { /* ignore */ }
-    throw new Error(detail);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+  try {
+    const res = await fetch(`${API_BASE}/travel-timing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (data?.detail) detail = data.detail;
+      } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json();
+  } catch (err) {
+    if ((err as any)?.name === 'AbortError') throw new Error('Travel timing timed out (60s).');
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 export async function fetchGroupTravelTiming(req: {

@@ -764,7 +764,7 @@ async function loadTravelTiming(): Promise<void> {
 
   const container = $('travelTimingList');
   if (container) {
-    container.innerHTML = '<div class="travel-loading">Calculating…</div>';
+    container.innerHTML = '<div class="travel-loading">Calculating travel window… (up to ~15s)</div>';
   }
   showLoader();
   try {
