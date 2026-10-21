@@ -1299,6 +1299,66 @@ function setProgress(frac: number) {
 
 // Load the demo chart immediately on startup.
 refreshSaved();
+
+// ---- JSON export/import for saved births ----
+$('exportBirths')?.addEventListener('click', async () => {
+  try {
+    const entries = await fetchBirths();
+    const blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'astro-births.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus(`Exported ${entries.length} saved birth(s).`);
+  } catch (err) {
+    setStatus(`Export failed: ${(err as Error).message}`, true);
+  }
+});
+
+const importBtn = $('importBirths') as HTMLButtonElement | null;
+const importFile = $('importBirthsFile') as HTMLInputElement | null;
+importBtn?.addEventListener('click', () => importFile?.click());
+importFile?.addEventListener('change', async () => {
+  const file = importFile.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error('Expected a JSON array of birth entries.');
+    const existing = await fetchBirths();
+    const existingKeys = new Set(existing.map((e) => `${e.datetime}|${e.latitude}|${e.longitude}`));
+    let added = 0;
+    let skipped = 0;
+    for (const raw of parsed) {
+      if (!raw || typeof raw !== 'object') { skipped++; continue; }
+      const name = String((raw as any).name ?? 'Unnamed').trim() || 'Unnamed';
+      const datetime = String((raw as any).datetime ?? '');
+      const latitude = Number((raw as any).latitude);
+      const longitude = Number((raw as any).longitude);
+      if (!datetime || Number.isNaN(latitude) || Number.isNaN(longitude)) { skipped++; continue; }
+      const key = `${datetime}|${latitude}|${longitude}`;
+      if (existingKeys.has(key)) { skipped++; continue; }
+      try {
+        await saveBirth({ name, datetime, latitude, longitude, note: (raw as any).note ?? null });
+        existingKeys.add(key);
+        added++;
+      } catch {
+        skipped++;
+      }
+    }
+    await refreshSaved();
+    setStatus(`Imported ${added} birth(s)${skipped ? `, skipped ${skipped}` : ''}.`);
+  } catch (err) {
+    setStatus(`Import failed: ${(err as Error).message}`, true);
+  } finally {
+    importFile.value = '';
+  }
+});
+
 void boot();
 
 async function boot() {

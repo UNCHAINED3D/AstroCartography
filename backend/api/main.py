@@ -223,6 +223,10 @@ class BirthEntryUpdate(BaseModel):
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/")
+def root() -> Any:
     # Serve the built SPA at the site root. Fall back to a JSON health/status
     # response when the frontend hasn't been built yet.
     index = _DIST / "index.html"
@@ -445,6 +449,26 @@ def group_travel_timing(req: GroupTravelTimingRequest) -> list[dict[str, Any]]:
         raise HTTPException(status_code=400, detail=str(exc) or "Invalid request")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Group travel timing error: {exc}")
+
+
+@app.post("/api/travel-timing")
+def travel_timing(req: TravelTimingRequest) -> list[dict[str, Any]]:
+    """Score each day in a window for travel favourability to a destination."""
+    key = payload_key(
+        "travel-timing", req.birth.datetime, req.birth.latitude, req.birth.longitude,
+        req.dest_lat, req.dest_lon, req.start_date, req.days, req.hour_step, req.stay_days,
+    )
+    try:
+        return cached(key, lambda: rate_travel_window(
+            req.birth.datetime, req.birth.latitude, req.birth.longitude,
+            req.dest_lat, req.dest_lon, req.start_date, days=req.days,
+            hour_step=req.hour_step, stay_days=req.stay_days,
+            include_warnings=req.include_warnings,
+        ))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Invalid request")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Travel timing error: {exc}")
 
 
 @app.post("/api/trip-plan")

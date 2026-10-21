@@ -137,6 +137,11 @@
           <summary>Saved Charts</summary>
           <div class="section-body">
             <h2 class="list-title">Saved births</h2>
+            <div class="form-actions">
+              <button type="button" id="exportBirths" class="ghost-btn">Export JSON</button>
+              <button type="button" id="importBirths" class="ghost-btn">Import JSON</button>
+              <input type="file" id="importBirthsFile" accept="application/json,.json" hidden />
+            </div>
             <ul id="savedList"></ul>
           </div>
         </details>
