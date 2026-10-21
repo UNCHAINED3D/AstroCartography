@@ -774,6 +774,7 @@ async function loadTravelTiming(): Promise<void> {
       dest_lon: destLng,
       start_date: startDate,
       days,
+      hour_step: 12,
     });
     const pin = currentPin || { lat: destLat, lng: destLng };
     renderTravelDays(results, pin);
