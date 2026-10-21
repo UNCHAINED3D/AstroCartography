@@ -33,6 +33,7 @@ const map2d = initMap2D($('map2d'));
 
 let is2DMode = false;
 let currentGoalFocus = 'all';
+let topCitiesReqId = 0;
 
 // Sidebar Panel Collapse Handler
 const togglePanelBtn = $('togglePanelBtn');
@@ -193,8 +194,8 @@ $('loadTravelTiming')?.addEventListener('click', async () => {
   const destLat = destPin ? destPin.lat : b.latitude;
   const destLng = destPin ? destPin.lng : b.longitude;
   const pinForRender = destPin || { lat: b.latitude, lng: b.longitude, name: 'birth location' };
-  const startDate = ($('travelStart') as HTMLInputElement).value;
-  if (!startDate) { setStatus('Pick a start date for the travel window.', true); return; }
+  const startDate = ($('travelStart') as HTMLInputElement).value || new Date().toISOString().slice(0, 10);
+  if (!($('travelStart') as HTMLInputElement)?.value) ($('travelStart') as HTMLInputElement).value = startDate;
   const days = parseInt(($('travelDays') as HTMLInputElement)?.value || '30') || 30;
   const useGroup = ($('useGroupTiming') as HTMLInputElement | null)?.checked;
   const companionSel = $('companionSelect') as HTMLSelectElement | null;
@@ -526,10 +527,10 @@ function handleMapClick(info: ClickInfo) {
 async function loadTopCities(): Promise<void> {
   const birth = currentBirth();
   if (!birth) return;
+  const reqId = ++topCitiesReqId;
 
   // Show skeleton while loading
   renderCitiesSkeleton();
-
   try {
     const cities = await fetchTopCities(
       { datetime: birth.datetime, latitude: birth.latitude, longitude: birth.longitude },
@@ -542,6 +543,7 @@ async function loadTopCities(): Promise<void> {
       undefined,
       ($('regionSelect') as HTMLSelectElement | null)?.value || undefined,
     );
+    if (reqId !== topCitiesReqId) return;
     lastTopCities = cities;
     renderTopCitiesCards(cities, (city: TopCity) => {
       // Fly to city & inspect
@@ -552,6 +554,7 @@ async function loadTopCities(): Promise<void> {
       handleMapClick(clickInfo);
     }, currentGoalFocus);
   } catch (err) {
+    if (reqId !== topCitiesReqId) return;
     const container = $('top-cities-list');
     if (container) {
       container.innerHTML = `<p class="report-empty error">Could not load recommendations: ${(err as Error).message}</p>`;
@@ -734,64 +737,9 @@ function deletePin(id: string): void {
   renderPins();
 }
 
-// ---------------------------------------------------------------------------
-// Travel Timing (electional)
-// ---------------------------------------------------------------------------
-
-async function loadTravelTiming(): Promise<void> {
-  const b = currentBirth();
-  if (!b) {
-    const c = $('travelTimingList');
-    if (c) c.innerHTML = '<p class="report-empty">Enter your birth data first.</p>';
-    return;
-  }
-  // Use the currently selected pin as the destination, or fall back to the
-  // birth location if no pin is active.
-  let destLat: number;
-  let destLng: number;
-  const currentPin = activePin();
-  if (currentPin) {
-    destLat = currentPin.lat;
-    destLng = currentPin.lng;
-  } else {
-    destLat = b.latitude;
-    destLng = b.longitude;
-  }
-
-  const startStr = ($('travelStart') as HTMLInputElement)?.value;
-  const startDate = startStr ? `${startStr}T00:00:00+00:00` : new Date().toISOString();
-  const days = parseInt(($('travelDays') as HTMLInputElement)?.value || '30') || 30;
-
-  const container = $('travelTimingList');
-  if (container) {
-    container.innerHTML = '<div class="travel-loading">Calculating travel window… (up to ~15s)</div>';
-  }
-  showLoader();
-  try {
-    const results = await fetchTravelTiming({
-      birth: b,
-      dest_lat: destLat,
-      dest_lon: destLng,
-      start_date: startDate,
-      days,
-      hour_step: 12,
-    });
-    const pin = currentPin || { lat: destLat, lng: destLng };
-    renderTravelDays(results, pin);
-  } catch (err) {
-    if (container) {
-      container.innerHTML = `<p class="report-empty error">Travel timing error: ${(err as Error).message}</p>`;
-    }
-  } finally {
-    hideLoader();
-  }
-}
-
-// Travel timing uses renderTravelDays from panel.ts — wired below.
-$('loadTravelTiming')?.addEventListener('click', () => { void loadTravelTiming(); });
-$('travelStart')?.addEventListener('change', () => { void loadTravelTiming(); });
-$('travelDays')?.addEventListener('change', () => { void loadTravelTiming(); });
-
+// Travel timing uses renderTravelDays from panel.ts — wired below (inline handler above).
+$('travelStart')?.addEventListener('change', () => ($('loadTravelTiming') as HTMLButtonElement)?.click());
+$('travelDays')?.addEventListener('change', () => ($('loadTravelTiming') as HTMLButtonElement)?.click());
 function buildLegend(data: ACGResponse) {
   const planets = [...new Set(data.lines.map((l) => l.planet))];
   const colorOf = (p: string) =>
@@ -1224,9 +1172,11 @@ async function drawCurrentBirth(): Promise<void> {
     void loadTopCities();
   } catch (err) {
     setStatus(`Error: ${(err as Error).message}`, true);
+  } finally {
+    renderPins();
+    if (!booted) booted = true;
+    hideLoader();
   }
-  renderPins();
-  if (!booted) { booted = true; hideLoader(); } else { hideLoader(); }
 }
 
 $('birthForm').addEventListener('submit', async (e) => {
