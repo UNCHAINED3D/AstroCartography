@@ -150,41 +150,28 @@ function llh(pts: number[][], h: number): Cesium.Cartesian3[] {
   }
   return out;
 }
-/** Generate a teardrop pin marker (canvas) tinted by the given color. */
-function makePinIcon(hex: string): { canvas: HTMLCanvasElement; height: number } {
-  const s = 64;
+/** Generate a red triangle pin marker (canvas), anchored at its tip. */
+function makePinIcon(_hex: string): { canvas: HTMLCanvasElement; height: number } {
+  const s = 48;
   const canvas = document.createElement('canvas');
   canvas.width = s;
   canvas.height = s;
   const g = canvas.getContext('2d')!;
-  const c = Cesium.Color.fromCssColorString(hex);
-
-  const cx = s / 2;
-  const cy = 20; // circle centre (tip of the teardrop points down to the anchor)
-  const r = 15;
   g.clearRect(0, 0, s, s);
-
-  // Teardrop body: a filled circle + a triangle converging at the bottom anchor.
-  const grad = g.createRadialGradient(cx - 4, cy - 5, 2, cx, cy, r + 2);
-  grad.addColorStop(0, c.toCssColorString());
-  grad.addColorStop(1, c.darken(0.45, new Cesium.Color(0, 0, 0, 1)).toCssColorString());
-
+  const cx = s / 2;
+  const top = 4;
+  const bottom = s - 4;
   g.beginPath();
-  g.moveTo(cx - 4, cy - r - 2);
-  g.quadraticCurveTo(cx - r - 4, cy + 2, cx - 3, s - 6);
-  g.lineTo(cx + 3, s - 6);
-  g.quadraticCurveTo(cx + r + 4, cy + 2, cx + 4, cy - r - 2);
+  g.moveTo(cx, bottom);
+  g.lineTo(cx - 14, top);
+  g.lineTo(cx + 14, top);
   g.closePath();
-  g.fillStyle = grad;
+  g.fillStyle = '#ff3333';
   g.fill();
-
-  // Inner highlight dot.
-  g.beginPath();
-  g.arc(cx, cy, r * 0.42, 0, Math.PI * 2);
-  g.fillStyle = c.brighten(0.6, new Cesium.Color(1, 1, 1, 1)).toCssColorString();
-  g.fill();
-
-  return { canvas, height: s }; // height in px acts as an upward offset so the tip anchors on the globe
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 1.5;
+  g.stroke();
+  return { canvas, height: s };
 }
 // ---- Free satellite imagery providers (swap any of these for another URL) ----
 const DAY_BASEMAP =
@@ -582,12 +569,11 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
     const icon = makePinIcon(p.color);
     addEntity(
       {
-        position: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, icon.height),
+        position: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, 0),
         billboard: {
           image: icon.canvas,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          scale: 1.6,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          scale: 1.2,
         },
       },
       { kind: 'pin', id: p.id ?? `pin-${nextPinIcon++}` },

@@ -185,8 +185,13 @@ function activePin(): Pin | null {
 $('loadTravelTiming')?.addEventListener('click', async () => {
   const b = currentBirth();
   if (!b) { setStatus('Enter a birth date and location first.', true); return; }
-  const pin = activePin();
-  if (!pin) { setStatus('Pin a destination on the globe first, then recalculate.', true); return; }
+  const active = activePin();
+  const selectedPinId = ($('travelPinSelect') as HTMLSelectElement | null)?.value;
+  const selectedPin = selectedPinId ? pins.find((p) => p.id === selectedPinId) : null;
+  const destPin = selectedPin || active;
+  const destLat = destPin ? destPin.lat : b.latitude;
+  const destLng = destPin ? destPin.lng : b.longitude;
+  const pinForRender = destPin || { lat: b.latitude, lng: b.longitude, name: 'birth location' };
   const startDate = ($('travelStart') as HTMLInputElement).value;
   if (!startDate) { setStatus('Pick a start date for the travel window.', true); return; }
   const days = parseInt(($('travelDays') as HTMLInputElement)?.value || '30') || 30;
@@ -207,30 +212,29 @@ $('loadTravelTiming')?.addEventListener('click', async () => {
       ];
       const daysData = await fetchGroupTravelTiming({
         births,
-        dest_lat: pin.lat,
-        dest_lon: pin.lng,
+        dest_lat: destLat,
+        dest_lon: destLng,
         start_date: start_iso,
         days,
       });
-      // Render combined score using renderTravelDays with adapted shape
       const adapted = daysData.map((d) => ({
         date: d.date,
         score: d.combined_score,
         influences: d.per_person.flatMap((p) => p.influences).slice(0, 5),
         warnings: d.per_person.flatMap((p) => p.warnings).slice(0, 5),
       }));
-      renderTravelDays(adapted as any, pin);
+      renderTravelDays(adapted as any, pinForRender as any);
       setStatus(`Group travel window: ${daysData.length} days scored.`);
     } else {
       const daysData = await fetchTravelTiming({
         birth: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
-        dest_lat: pin.lat,
-        dest_lon: pin.lng,
+        dest_lat: destLat,
+        dest_lon: destLng,
         start_date: start_iso,
         days,
       });
-      renderTravelDays(daysData, pin);
-      setStatus(`Travel window: ${daysData.length} days scored for (${pin.lat.toFixed(2)}°, ${pin.lng.toFixed(2)}°).`);
+      renderTravelDays(daysData, pinForRender as any);
+      setStatus(`Travel window: ${daysData.length} days scored for (${destLat.toFixed(2)}°, ${destLng.toFixed(2)}°).`);
     }
   } catch (err) {
     setStatus(`Travel timing error: ${(err as Error).message}`, true);
@@ -318,12 +322,42 @@ function persistPins() {
 function birthKey(b: { datetime: string; latitude: number; longitude: number }): string {
   return `${b.datetime}|${b.latitude}|${b.longitude}`;
 }
+function nearestCity(lat: number, lng: number): string | null {
+  if (!CITY_INDEX || CITY_INDEX.length === 0) return null;
+  let best: { name: string; d: number } | null = null;
+  for (const c of CITY_INDEX) {
+    const dlat = (c.lat - lat) * Math.PI / 180;
+    const dlng = (c.lng - lng) * Math.PI / 180;
+    const a = Math.sin(dlat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(c.lat * Math.PI / 180) * Math.sin(dlng / 2) ** 2;
+    const d = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    if (!best || d < best.d) best = { name: c.name, d };
+  }
+  return best ? best.name : null;
+}
+
 function pinLabel(p: Pin): string {
   const ns = p.lat >= 0 ? 'N' : 'S';
   const ew = p.lng >= 0 ? 'E' : 'W';
-  return `${Math.abs(p.lat).toFixed(1)}°${ns}, ${Math.abs(p.lng).toFixed(1)}°${ew}`;
+  const city = nearestCity(p.lat, p.lng);
+  const base = `${Math.abs(p.lat).toFixed(2)}°${ns}, ${Math.abs(p.lng).toFixed(2)}°${ew}`;
+  return city ? `${city} · ${base}` : base;
 }
 
+function refreshTravelPinSelect(): void {
+  const sel = $('travelPinSelect') as HTMLSelectElement | null;
+  if (!sel) return;
+  const b = currentBirth();
+  const mine = b ? pins.filter((p) => p.birthKey === birthKey(b)) : [];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Birth location (default)</option>';
+  mine.forEach((p) => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = pinLabel(p);
+    sel.appendChild(opt);
+  });
+  if (prev && mine.some((p) => p.id === prev)) sel.value = prev;
+}
 function currentBirth(): { datetime: string; latitude: number; longitude: number } | null {
   return readBirth();
 }
@@ -654,6 +688,7 @@ function renderPins(): void {
     list.appendChild(li);
   });
   syncPins();
+  refreshTravelPinSelect();
 }
 
 function deletePin(id: string): void {
