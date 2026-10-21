@@ -191,6 +191,10 @@ const MAX_HEIGHT = GLOBE_RADIUS * 6; // ~38,268 km
 const CITY_HEIGHT = GLOBE_RADIUS * 0.1; // city labels/dots below ~638 km
 
 export function initGlobe(container: HTMLElement): GlobeHandle {
+  // Allow more parallel tile requests to the imagery server so the globe
+  // fills in faster without reducing image quality.
+  Cesium.RequestScheduler.maximumRequestsPerServer = 32;
+  Cesium.RequestScheduler.maximumRequests = 128;
   // ---- Viewer (no Ion: we bring our own free imagery providers) ----
   const viewer = new Cesium.Viewer(container, {
     baseLayer: false, // do not request the default Cesium Ion basemap
@@ -210,6 +214,13 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
 
   const scene = viewer.scene;
   scene.globe.depthTestAgainstTerrain = false;
+  // Load coarse tiles first for a fast first paint, then refine to full
+  // quality shortly after.
+  scene.globe.maximumScreenSpaceError = 16;
+  scene.globe.preloadAncestors = true;
+  scene.globe.preloadSiblings = true;
+  scene.globe.tileCacheSize = 1000;
+  scene.globe.showWaterEffect = false;
   // Use a dark "ocean" base color so areas where the coarse imagery hasn't
   // loaded (or is transparent) stay dark instead of flashing pale white.
   scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a1626');
@@ -221,6 +232,8 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
 
   // Dark space backdrop (matches the old night-sky look).
   viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#05070d');
+  // Disable fog so the horizon doesn't trigger extra tile requests.
+  viewer.scene.fog.enabled = false;
   // The ground-atmosphere haze washes the entire globe out to a pale white
   // sheet when the camera is far away — disable it so the imagery keeps its
   // true colours at every zoom level. Keep only a thin, dimmed sky rim for
@@ -245,7 +258,9 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
 
   async function ensureDayLayer() {
     if (dayLayer) return;
-    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(DAY_BASEMAP);
+    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(DAY_BASEMAP, {
+      enablePickFeatures: false,
+    } as any);
     dayLayer = viewer.imageryLayers.addImageryProvider(prov);
     dayLayer.show = dayMode;
     applyImagery();
@@ -253,14 +268,17 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   }
   async function ensureNightLayer() {
     if (nightLayer) return;
-    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(NIGHT_BASEMAP);
+    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(NIGHT_BASEMAP, {
+      enablePickFeatures: false,
+    } as any);
     nightLayer = viewer.imageryLayers.addImageryProvider(prov);
     nightLayer.show = !dayMode;
     applyImagery();
     raiseLabelsToTop();
   }
-  void ensureDayLayer();
-  void ensureNightLayer();
+  // Load only the day basemap first; pull in the label overlay afterwards so
+  // the two tile streams don't compete on initial load.
+  void ensureDayLayer().then(() => void ensureRefLabels());
 
   // Tiled place-label overlay (country + city names). Loaded lazily; shown
   // only on the day globe when labels are enabled (the night canvas already
@@ -275,12 +293,13 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   }
   async function ensureRefLabels() {
     if (refLabelsLayer) return;
-    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(REF_LABELS);
+    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(REF_LABELS, {
+      enablePickFeatures: false,
+    } as any);
     refLabelsLayer = viewer.imageryLayers.addImageryProvider(prov);
     refLabelsLayer.show = dayMode && refLabelsVisible;
     raiseLabelsToTop();
   }
-  void ensureRefLabels();
 
   function refreshRefLabels() {
     if (refLabelsLayer) {
@@ -320,6 +339,7 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
     dayMode = day;
     if (dayLayer) dayLayer.show = day;
     if (nightLayer) nightLayer.show = !day;
+    else if (!day) void ensureNightLayer();
     // Lighting is always disabled so daytime imagery is lit uniformly across
     // the whole globe (no sun terminator / day-night shadow boundary).
     scene.globe.enableLighting = false;
@@ -827,6 +847,12 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
 
   // Initial view (boot() will fly to the birth place on the first draw).
   flyTo(-27.47, 153.026, 3e6, 0);
+
+  // Progressive refinement: start coarse for a fast first paint, then switch to
+  // full-quality tiles once the initial view has had time to stream in.
+  window.setTimeout(() => {
+    scene.globe.maximumScreenSpaceError = 2;
+  }, 1200);
 
   // ---- Public handle (preserves the original GlobeHandle contract) ----
   return {
