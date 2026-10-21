@@ -327,9 +327,27 @@
           </div>
           <button type="button" id="loadTravelTiming" class="ghost-btn full">Calculate travel window</button>
         </div>
-        <div id="travelTimingList">
-          <p class="report-empty">Pin a destination on the globe, then calculate your travel window.</p>
-        </div>
+         <div id="travelTimingList">
+           <p class="report-empty">Pin a destination on the globe, then calculate your travel window.</p>
+         </div>
+         <div class="travel-tab-header" style="margin-top:12px;">
+           <div class="cities-tab-title"><span class="cities-star">✦</span><span>Group Travel</span></div>
+           <p class="cities-tab-sub">Score days for you + saved companions.</p>
+           <label>Companions
+             <select id="companionSelect" multiple size="4" style="width:100%;"></select>
+           </label>
+           <label style="display:block;margin-top:6px;"><input type="checkbox" id="useGroupTiming"> Use group scoring</label>
+         </div>
+         <div class="travel-tab-header" style="margin-top:12px;">
+           <div class="cities-tab-title"><span class="cities-star">✦</span><span>Trip Planner</span></div>
+           <p class="cities-tab-sub">Optimize a multi-stop trip from your pinned places.</p>
+           <div class="row-2">
+             <label>Total days <input type="number" id="tripTotalDays" value="14" min="3" max="60" /></label>
+             <label>Start <input type="date" id="tripStart" /></label>
+           </div>
+           <button type="button" id="planTrip" class="ghost-btn full">Plan trip from pins</button>
+         </div>
+         <div id="tripPlanList"></div>
       </div>
     </aside>
 

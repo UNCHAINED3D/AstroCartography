@@ -1,9 +1,9 @@
 import './style.css';
-import { fetchACG, fetchBirths, saveBirth, deleteBirth, fetchAnalysis, fetchTopCities, fetchTransitACG, fetchProgressedACG, fetchGeodetic, fetchFixedStars, fetchMidpoints, fetchCrossings, fetchSolarReturn, fetchLunarReturn, fetchTravelTiming } from './api';
+import { fetchACG, fetchBirths, saveBirth, deleteBirth, fetchAnalysis, fetchTopCities, fetchTransitACG, fetchProgressedACG, fetchGeodetic, fetchFixedStars, fetchMidpoints, fetchCrossings, fetchSolarReturn, fetchLunarReturn, fetchTravelTiming, fetchGroupTravelTiming, fetchTripPlan } from './api';
 import { initGlobe } from './globe';
 import { initMap2D } from './map2d';
 import type { HoverInfo, ClickInfo } from './globe';
-import { renderReport, renderHoverPreview, clearReport, renderTopCitiesCards, renderCitiesSkeleton, renderTravelDays, renderTravelSkeleton } from './panel';
+import { renderReport, renderHoverPreview, clearReport, renderTopCitiesCards, renderCitiesSkeleton, renderTravelDays, renderTravelSkeleton, scoreColor } from './panel';
 import type { ACGResponse, BirthEntry, TopCity } from './types';
 import {
   acgToGeoJSON,
@@ -190,19 +190,48 @@ $('loadTravelTiming')?.addEventListener('click', async () => {
   const startDate = ($('travelStart') as HTMLInputElement).value;
   if (!startDate) { setStatus('Pick a start date for the travel window.', true); return; }
   const days = parseInt(($('travelDays') as HTMLInputElement)?.value || '30') || 30;
+  const useGroup = ($('useGroupTiming') as HTMLInputElement | null)?.checked;
+  const companionSel = $('companionSelect') as HTMLSelectElement | null;
+  const companionIds = companionSel ? Array.from(companionSel.selectedOptions).map((o) => o.value) : [];
+  const companions = companionIds
+    .map((id) => savedBirthsCache.find((e) => String(e.id) === id))
+    .filter(Boolean) as BirthEntry[];
   try {
     setStatus('Calculating travel window…');
     renderTravelSkeleton();
     const start_iso = `${startDate}T12:00:00+00:00`;
-    const daysData = await fetchTravelTiming({
-      birth: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
-      dest_lat: pin.lat,
-      dest_lon: pin.lng,
-      start_date: start_iso,
-      days,
-    });
-    renderTravelDays(daysData, pin);
-    setStatus(`Travel window: ${daysData.length} days scored for (${pin.lat.toFixed(2)}°, ${pin.lng.toFixed(2)}°).`);
+    if (useGroup && companions.length) {
+      const births = [
+        { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
+        ...companions.map((c) => ({ datetime: c.datetime, latitude: c.latitude, longitude: c.longitude })),
+      ];
+      const daysData = await fetchGroupTravelTiming({
+        births,
+        dest_lat: pin.lat,
+        dest_lon: pin.lng,
+        start_date: start_iso,
+        days,
+      });
+      // Render combined score using renderTravelDays with adapted shape
+      const adapted = daysData.map((d) => ({
+        date: d.date,
+        score: d.combined_score,
+        influences: d.per_person.flatMap((p) => p.influences).slice(0, 5),
+        warnings: d.per_person.flatMap((p) => p.warnings).slice(0, 5),
+      }));
+      renderTravelDays(adapted as any, pin);
+      setStatus(`Group travel window: ${daysData.length} days scored.`);
+    } else {
+      const daysData = await fetchTravelTiming({
+        birth: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
+        dest_lat: pin.lat,
+        dest_lon: pin.lng,
+        start_date: start_iso,
+        days,
+      });
+      renderTravelDays(daysData, pin);
+      setStatus(`Travel window: ${daysData.length} days scored for (${pin.lat.toFixed(2)}°, ${pin.lng.toFixed(2)}°).`);
+    }
   } catch (err) {
     setStatus(`Travel timing error: ${(err as Error).message}`, true);
   }
@@ -214,7 +243,52 @@ $('loadTravelTiming')?.addEventListener('click', async () => {
 
 
 
-// ---- Location analysis: hover preview + single-click-to-pin (pin mode only) on the right panel ----
+$('planTrip')?.addEventListener('click', async () => {
+  const b = currentBirth();
+  if (!b) { setStatus('Enter birth data first.', true); return; }
+  if (!pins.length) { setStatus('Pin at least one destination first.', true); return; }
+  const totalDays = parseInt(($('tripTotalDays') as HTMLInputElement)?.value || '14') || 14;
+  const startStr = ($('tripStart') as HTMLInputElement)?.value || new Date().toISOString().slice(0, 10);
+  const flexEnd = new Date(new Date(startStr).getTime() + 14 * 86400000).toISOString().slice(0, 10);
+  try {
+    setStatus('Planning trip…');
+    const stops = pins.map((p) => ({
+      latitude: p.lat,
+      longitude: p.lng,
+      name: p.birthName || `${p.lat.toFixed(1)},${p.lng.toFixed(1)}`,
+      min_days: 2,
+      max_days: 4,
+      flex_start: startStr,
+      flex_end: flexEnd,
+    }));
+    const res = await fetchTripPlan({
+      birth: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
+      stops,
+      total_days: totalDays,
+    });
+    const container = $('tripPlanList');
+    if (!container) return;
+    container.innerHTML = '';
+    const header = document.createElement('div');
+    header.className = 'travel-summary';
+    header.innerHTML = `<div class="travel-summary-title">🗺 Trip Plan</div><div class="travel-summary-sub">Total score: ${res.total_score}</div>`;
+    container.appendChild(header);
+    res.itinerary.forEach((it) => {
+      const row = document.createElement('div');
+      row.className = 'travel-row';
+      row.innerHTML = `<div class="travel-date">${it.name}</div><div class="travel-score" style="background:${scoreColor(it.score)}">${it.score.toFixed(0)}</div>`;
+      const inf = document.createElement('div');
+      inf.className = 'travel-influences';
+      const l1 = document.createElement('div'); l1.className = 'travel-inf-line'; l1.textContent = `Arrive ${it.arrival_date} · ${it.length_days} days`; inf.appendChild(l1);
+      it.daily.forEach((d) => { const ld = document.createElement('div'); ld.className = 'travel-inf-line'; ld.textContent = `${d.date}: ${d.score.toFixed(0)}`; inf.appendChild(ld); });
+      row.appendChild(inf);
+      container.appendChild(row);
+    });
+    setStatus(`Trip planned: ${res.itinerary.length} stops.`);
+  } catch (err) {
+    setStatus(`Trip plan error: ${(err as Error).message}`, true);
+  }
+});
 let pinned = false;
 let currentPinId: string | null = null;
 
@@ -286,6 +360,19 @@ function refreshCompareSelect(): void {
   }
 }
 
+function refreshCompanionSelect(): void {
+  const sel = $('companionSelect') as HTMLSelectElement | null;
+  if (!sel) return;
+  const prev = Array.from(sel.selectedOptions).map((o) => o.value);
+  sel.innerHTML = '';
+  savedBirthsCache.forEach((entry) => {
+    const opt = document.createElement('option');
+    opt.value = String(entry.id);
+    opt.textContent = entry.name;
+    if (prev.includes(String(entry.id))) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 async function setCompareBirth(entry: BirthEntry | null): Promise<void> {
   compareBirth = entry;
   if (!entry) {
@@ -1116,6 +1203,7 @@ async function refreshSaved() {
     const entries = await fetchBirths();
     savedBirthsCache = entries;
     refreshCompareSelect();
+    refreshCompanionSelect();
     list.innerHTML = '';
     if (entries.length === 0) {
       const li = document.createElement('li');
