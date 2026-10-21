@@ -220,8 +220,9 @@ class BirthEntryUpdate(BaseModel):
     note: Optional[str] = None
 
 
-@app.get("/")
-def root() -> Any:
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
     # Serve the built SPA at the site root. Fall back to a JSON health/status
     # response when the frontend hasn't been built yet.
     index = _DIST / "index.html"

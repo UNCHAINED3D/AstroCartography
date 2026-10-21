@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: astrocartography
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      pip install -r backend/requirements.txt
+      cd frontend && npm ci && npm run build && cd ..
+      mkdir -p kernels
+      python - <<'PY'
+      import os, urllib.request
+      p = "kernels/de440.bsp"
+      if not os.path.exists(p):
+          urllib.request.urlretrieve(
+              "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp", p
+          )
+      print("kernel ready:", os.path.exists(p), os.path.getsize(p) if os.path.exists(p) else 0)
+      PY
+    startCommand: cd backend && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: MOIRA_KERNEL_PATH
+        value: /opt/render/project/src/kernels/de440.bsp
+      - key: PYTHON_VERSION
+        value: "3.11.0"

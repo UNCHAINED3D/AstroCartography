@@ -18,7 +18,11 @@ from typing import Any
 from moira.chart import create_chart
 from moira_engine import BODIES, jd_from_iso, moira_reader
 from moira.nodes import nodes_and_apsides_at
-from moira import is_void_of_course
+try:
+    from moira import is_void_of_course as _is_voc
+except Exception:  # pragma: no cover - optional on some moira builds
+    def _is_voc(jd, reader=None, modern=False):
+        return False
 
 # ---- Scoring weights -------------------------------------------------------
 BENEFICIANS = {'Jupiter', 'Venus', 'Sun'}
@@ -201,7 +205,7 @@ def _score_hour(
     else:
         score -= 1.0
     try:
-        if is_void_of_course(jd_hour, reader=reader):
+        if _is_voc(jd_hour, reader=reader):
             score -= 8.0
             influences.append('✧ Moon void of course')
             warnings.append('Moon void of course')
