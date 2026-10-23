@@ -948,9 +948,31 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
       zoomChangeCb = cb;
     },
     preloadTextures(_onProgress?: (frac: number) => void): Promise<void> {
-      // Cesium streams tiled imagery lazily; there is nothing to pre-bake.
-      _onProgress?.(1);
-      return Promise.resolve();
+      return (async () => {
+        await ensureDayLayer();
+        const prevSSE = scene.globe.maximumScreenSpaceError;
+        scene.globe.maximumScreenSpaceError = 2;
+        viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(0, 0, GLOBE_RADIUS * 6) });
+        const onProgress = _onProgress;
+        await new Promise<void>((resolve) => {
+          let done = false;
+          const finish = () => { if (!done) { done = true; resolve(); } };
+          const sub = scene.globe.tileLoadProgressEvent.addEventListener((pending: number) => {
+            if (pending === 0) { onProgress?.(1); finish(); }
+            else { onProgress?.(Math.max(0, 1 - pending / 200)); }
+          });
+          const interval = window.setInterval(() => viewer.scene.requestRender(), 100);
+          const timeout = window.setTimeout(() => { window.clearInterval(interval); try { sub(); } catch {} finish(); }, 90000);
+          const check = window.setInterval(() => {
+            if (scene.globe.tilesLoaded) {
+              window.clearInterval(check); window.clearInterval(interval); window.clearTimeout(timeout);
+              try { sub(); } catch {} onProgress?.(1); finish();
+            }
+          }, 200);
+        });
+        scene.globe.maximumScreenSpaceError = prevSSE;
+        viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(0, 20, GLOBE_RADIUS * 2.5) });
+      })();
     },
     setLabels(data: { countries: any[]; cities: any[] }) {
       // Custom label entities removed — labels come from the Esri tiled
