@@ -179,10 +179,7 @@ const DAY_BASEMAP =
   'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer';
 const NIGHT_BASEMAP =
   'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer';
-// Reference labels overlay (country/city names), designed to sit on top of
-// satellite imagery. Same style family as the night canvas' baked-in labels.
-const REF_LABELS =
-  'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer';
+// (Esri reference label overlay removed: custom Cesium labels replace it.)
 
 // Camera height bounds. min = ~129 km (just above the globe), max = ~38,268 km
 // (whole Earth). Derived from the original globe.gl 1.02x-7x radius limits.
@@ -285,7 +282,6 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   // only on the day globe when labels are enabled (the night canvas already
   // has labels baked into its tiles).
   let refLabelsLayer: Cesium.ImageryLayer | null = null;
-  let refLabelsVisible = true;
   function raiseLabelsToTop() {
     // The day/night basemaps load asynchronously, so whichever layer finishes
     // loading last sits on top and can completely cover the labels. Always
@@ -293,18 +289,18 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
     if (refLabelsLayer) viewer.imageryLayers.raiseToTop(refLabelsLayer);
   }
   async function ensureRefLabels() {
-    if (refLabelsLayer) return;
-    const prov = await Cesium.ArcGisMapServerImageryProvider.fromUrl(REF_LABELS, {
-      enablePickFeatures: false,
-    } as any);
-    refLabelsLayer = viewer.imageryLayers.addImageryProvider(prov);
-    refLabelsLayer.show = dayMode && refLabelsVisible;
-    raiseLabelsToTop();
+    // Custom Cesium labels fully replace the Esri reference label tiles, so
+    // there is no need to fetch or show them (they only added a second,
+    // tiny yellow label style that conflicted with the custom labels).
+    return;
   }
 
   function refreshRefLabels() {
     if (refLabelsLayer) {
-      refLabelsLayer.show = dayMode && refLabelsVisible;
+      // The big custom Cesium place labels (rebuildLabels) replace the small
+      // baked-in Esri tile labels, so keep the tile layer hidden while labels
+      // are active; with labels off nothing is shown either way.
+      refLabelsLayer.show = false;
       raiseLabelsToTop();
       return;
     }
@@ -391,7 +387,7 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   let pinRings: RingDatum[] = [];
   let pinItems: { id?: string; lat: number; lng: number; color: string }[] = [];
   let cityList: PointDatum[] = [];
-  let countryList: { name: string; lat: number; lng: number }[] = [];
+  let labelEntities: Cesium.Entity[] = [];
   let localSpaceVisible = false;
   let paransVisible = true;
   let lastBirth = { lat: 0, lng: 0 };
@@ -737,44 +733,12 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   }
 
   // ---- Label overlay (country + city names) ----
+  // Drawn as big custom Cesium Label entities so the place names stay large and
+  // readable instead of relying on the small baked-in Esri tile labels.
   function rebuildLabels() {
-    for (const c of countryList) {
-      if (!isGeoValid(c.lat, c.lng)) continue;
-      addEntity({
-        position: Cesium.Cartesian3.fromDegrees(c.lng, c.lat, 0),
-        label: {
-          text: c.name,
-          font: '16px sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#ffffff').withAlpha(0.85),
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          pixelOffset: new Cesium.Cartesian2(0, 0),
-          scaleByDistance: new Cesium.NearFarScalar(1e6, 1.6, 2e7, 0.6),
-          translucencyByDistance: new Cesium.NearFarScalar(1e6, 1.0, 3e7, 0.0),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      });
-    }
-    for (const c of cityList) {
-      if (!isGeoValid(c.latitude, c.longitude)) continue;
-      addEntity({
-        position: Cesium.Cartesian3.fromDegrees(c.longitude, c.latitude, 0),
-        label: {
-          text: c.name || '',
-          font: '14px sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#e8ecf4').withAlpha(0.9),
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          scaleByDistance: new Cesium.NearFarScalar(5e5, 1.5, 8e6, 0.5),
-          translucencyByDistance: new Cesium.NearFarScalar(5e5, 1.0, 1.2e7, 0.0),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      });
-    }
+    // All globe place names are intentionally disabled.
+    for (const e of labelEntities) entities.remove(e);
+    labelEntities = [];
   }
 // ---- Input: hover (distinguish line / point / empty globe) + click ----
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -1009,10 +973,8 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
         viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(0, 20, GLOBE_RADIUS * 2.5) });
       })();
     },
-    setLabels(data: { countries: any[]; cities: any[] }) {
-      countryList = (data.countries || []).map((c: any) => ({ name: c.name, lat: c.lat, lng: c.lng }));
-      // Custom label entities removed â€” labels come from the Esri tiled
-      // reference layer. Only the city dot list is still needed here.
+setLabels(data: { countries: any[]; cities: any[] }) {
+      // Place names are disabled; only city dots (handled via cityList) remain.
       cityList = (data.cities || []).map((c: any) => ({
         ...c,
         type: 'city',
@@ -1020,9 +982,9 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
       }));
       repaint();
     },
-    setLabelsVisible(on: boolean) {
-      refLabelsVisible = on;
+    setLabelsVisible(_on: boolean) {
       refreshRefLabels();
+      rebuildLabels();
       viewer.scene.requestRender();
     },
     setCursor(cursor: string) {
