@@ -1,3 +1,3 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
-moira-astro==6.1.0
+moira-astro==6.10.1
