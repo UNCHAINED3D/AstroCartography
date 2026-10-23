@@ -35,12 +35,20 @@ if not Path(_KERNEL_PATH).exists():
 # Chiron ACG lines. The NAIF asteroids.bsp is rejected by Moira's native reader,
 # so Chiron is enabled only when a compatible kernel is actually present.
 _MINOR_BODY_KERNELS = ("centaurs.bsp", "minor_bodies.bsp")
-_MINOR_KERNEL_PATH = next(
-    (Path.home() / ".moira" / "kernels" / name
-     for name in _MINOR_BODY_KERNELS
-     if (Path.home() / ".moira" / "kernels" / name).exists()),
-    None,
-)
+import moira
+_minor_candidates = [
+    Path.home() / ".moira" / "kernels",
+    Path(moira.__file__).resolve().parent,  # shipped with moira wheel
+]
+_MINOR_KERNEL_PATH = None
+for base in _minor_candidates:
+    for name in _MINOR_BODY_KERNELS:
+        p = base / name
+        if p.exists():
+            _MINOR_KERNEL_PATH = p
+            break
+    if _MINOR_KERNEL_PATH:
+        break
 _HAS_CHIRON = _MINOR_KERNEL_PATH is not None
 
 # Loaded once for the process lifetime. The planetary reader is always the base.
