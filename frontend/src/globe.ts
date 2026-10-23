@@ -851,7 +851,7 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   // Progressive refinement: start coarse for a fast first paint, then switch to
   // full-quality tiles once the initial view has had time to stream in.
   window.setTimeout(() => {
-    scene.globe.maximumScreenSpaceError = 2;
+    scene.globe.maximumScreenSpaceError = 1;
   }, 1200);
 
   // ---- Public handle (preserves the original GlobeHandle contract) ----
