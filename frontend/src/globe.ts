@@ -970,7 +970,7 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
             }
           }, 200);
         });
-        scene.globe.maximumScreenSpaceError = prevSSE;
+        scene.globe.maximumScreenSpaceError = 1;
         viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(0, 20, GLOBE_RADIUS * 2.5) });
       })();
     },
