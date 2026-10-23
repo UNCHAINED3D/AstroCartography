@@ -67,6 +67,7 @@ export type HoverInfo =
 export type ClickInfo = { type: 'click'; lat: number; lng: number };
 
 interface PointDatum {
+  name?: string;
   planet?: string;
   type?: string;
   latitude: number;
@@ -390,6 +391,7 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
   let pinRings: RingDatum[] = [];
   let pinItems: { id?: string; lat: number; lng: number; color: string }[] = [];
   let cityList: PointDatum[] = [];
+  let countryList: { name: string; lat: number; lng: number }[] = [];
   let localSpaceVisible = false;
   let paransVisible = true;
   let lastBirth = { lat: 0, lng: 0 };
@@ -736,9 +738,43 @@ export function initGlobe(container: HTMLElement): GlobeHandle {
 
   // ---- Label overlay (country + city names) ----
   function rebuildLabels() {
-    // Custom label entities removed — place labels now come from the Esri
-    // tiled reference layer (ensureRefLabels), which is dynamic and matches
-    // the night canvas' baked-in labels.
+    for (const c of countryList) {
+      if (!isGeoValid(c.lat, c.lng)) continue;
+      addEntity({
+        position: Cesium.Cartesian3.fromDegrees(c.lng, c.lat, 0),
+        label: {
+          text: c.name,
+          font: '16px sans-serif',
+          fillColor: Cesium.Color.fromCssColorString('#ffffff').withAlpha(0.85),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          pixelOffset: new Cesium.Cartesian2(0, 0),
+          scaleByDistance: new Cesium.NearFarScalar(1e6, 1.6, 2e7, 0.6),
+          translucencyByDistance: new Cesium.NearFarScalar(1e6, 1.0, 3e7, 0.0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    }
+    for (const c of cityList) {
+      if (!isGeoValid(c.latitude, c.longitude)) continue;
+      addEntity({
+        position: Cesium.Cartesian3.fromDegrees(c.longitude, c.latitude, 0),
+        label: {
+          text: c.name || '',
+          font: '14px sans-serif',
+          fillColor: Cesium.Color.fromCssColorString('#e8ecf4').withAlpha(0.9),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          scaleByDistance: new Cesium.NearFarScalar(5e5, 1.5, 8e6, 0.5),
+          translucencyByDistance: new Cesium.NearFarScalar(5e5, 1.0, 1.2e7, 0.0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    }
   }
 // ---- Input: hover (distinguish line / point / empty globe) + click ----
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -950,7 +986,6 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
     preloadTextures(_onProgress?: (frac: number) => void): Promise<void> {
       return (async () => {
         await ensureDayLayer();
-        const prevSSE = scene.globe.maximumScreenSpaceError;
         scene.globe.maximumScreenSpaceError = 2;
         viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(0, 0, GLOBE_RADIUS * 6) });
         const onProgress = _onProgress;
@@ -975,7 +1010,8 @@ setData(data: ACGResponse, birth: { lat: number; lng: number }) {
       })();
     },
     setLabels(data: { countries: any[]; cities: any[] }) {
-      // Custom label entities removed — labels come from the Esri tiled
+      countryList = (data.countries || []).map((c: any) => ({ name: c.name, lat: c.lat, lng: c.lng }));
+      // Custom label entities removed â€” labels come from the Esri tiled
       // reference layer. Only the city dot list is still needed here.
       cityList = (data.cities || []).map((c: any) => ({
         ...c,
