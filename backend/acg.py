@@ -69,6 +69,28 @@ def _node_acg_lines(jd_ut: float, lat_step: float) -> list[Any]:
         return []
 
 
+def _lilith_acg_lines(jd_ut: float, lat_step: float) -> list[Any]:
+    """Compute ACG lines for Mean Black Moon Lilith via Moira's ``acg_lines``."""
+    try:
+        from moira.astrocartography import acg_lines as _acg_lines
+        from moira.coordinates import ecliptic_to_equatorial
+        from moira.julian import apparent_sidereal_time_at
+        from moira.nodes import mean_lilith
+        from moira.obliquity import true_obliquity
+
+        ld = mean_lilith(jd_ut)
+        obliq = true_obliquity(jd_ut)
+        ra, dec = ecliptic_to_equatorial(ld.longitude, 0.0, obliq)
+        gmst_deg = apparent_sidereal_time_at(jd_ut, longitude=0.0)
+        return _acg_lines(
+            {"Lilith": (ra, dec)}, gmst_deg, lat_step=lat_step, jd_ut=jd_ut
+        )
+    except Exception as exc:
+        print(f"[acg] lilith lines skipped: {exc}")
+        return []
+
+
+
 def _local_space_list(chart: Any, lat: float, lon: float, bodies: list[str]) -> list[dict[str, Any]]:
     """Birth-place Local Space rays, one per body, as GeoJSON LineStrings."""
     from moira.local_space import local_space_from_chart
@@ -173,11 +195,12 @@ def generate_acg(
         acg_lines_main = acg_from_chart(chart, bodies=calc_bodies, lat_step=lat_step)
         subpoints = subplanetary_from_chart(chart, bodies=_planet_bodies)
         node_lines = _node_acg_lines(jd_ut, lat_step)
+        lilith_lines = _lilith_acg_lines(jd_ut, lat_step)
         local_space = _local_space_list(chart, latitude, longitude, _planet_bodies)
 
         # Merge planet lines + node lines; build the globe features and keep the
         # unsplit polylines for paran intersection.
-        all_acg = list(acg_lines_main) + node_lines
+        all_acg = list(acg_lines_main) + node_lines + lilith_lines
         lines_out: list[dict[str, Any]] = []
         polylines: dict[tuple[str, str], list[list[float]]] = {}
 

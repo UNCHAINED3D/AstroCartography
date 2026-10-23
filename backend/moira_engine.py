@@ -94,6 +94,7 @@ PLANET_COLORS: dict[str, str] = {
     "Neptune": "#5A7FFF",
     "Pluto": "#9D4EDD",
     "Chiron": "#2EC4B6",
+    "Lilith": "#FF3366",
     "True Node": "#FF70A6",
 }
 
