@@ -86,8 +86,7 @@ def generate_analysis(
         iso_datetime, birth_lat, birth_lon, bodies=calc_bodies, lat_step=1.0
     )
 
-    from moira.chart import create_chart
-    from moira.constants import sign_of
+    from swe_engine import create_chart, sign_of
 
     with _reader():
         # 2. Relocated chart at the clicked location (same moment/planets).

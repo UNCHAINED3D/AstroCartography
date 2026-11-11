@@ -51,15 +51,17 @@ def _node_acg_lines(jd_ut: float, lat_step: float) -> list[Any]:
     machinery Moira uses for planets.
     """
     try:
-        from moira.astrocartography import acg_lines as _acg_lines
-        from moira.coordinates import ecliptic_to_equatorial
-        from moira.julian import apparent_sidereal_time_at
-        from moira.nodes import true_node
-        from moira.obliquity import true_obliquity
+        from swe_engine import (
+            acg_lines as _acg_lines,
+            ecliptic_to_equatorial,
+            apparent_sidereal_time_at,
+            true_node,
+            true_obliquity,
+        )
 
         nd = true_node(jd_ut)
         obliq = true_obliquity(jd_ut)
-        ra, dec = ecliptic_to_equatorial(nd.longitude, 0.0, obliq)
+        ra, dec = ecliptic_to_equatorial(nd, 0.0, obliq)
         gmst_deg = apparent_sidereal_time_at(jd_ut, longitude=0.0)
         return _acg_lines(
             {"True Node": (ra, dec)}, gmst_deg, lat_step=lat_step, jd_ut=jd_ut
@@ -72,15 +74,17 @@ def _node_acg_lines(jd_ut: float, lat_step: float) -> list[Any]:
 def _lilith_acg_lines(jd_ut: float, lat_step: float) -> list[Any]:
     """Compute ACG lines for Mean Black Moon Lilith via Moira's ``acg_lines``."""
     try:
-        from moira.astrocartography import acg_lines as _acg_lines
-        from moira.coordinates import ecliptic_to_equatorial
-        from moira.julian import apparent_sidereal_time_at
-        from moira.nodes import mean_lilith
-        from moira.obliquity import true_obliquity
+        from swe_engine import (
+            acg_lines as _acg_lines,
+            ecliptic_to_equatorial,
+            apparent_sidereal_time_at,
+            mean_lilith,
+            true_obliquity,
+        )
 
         ld = mean_lilith(jd_ut)
         obliq = true_obliquity(jd_ut)
-        ra, dec = ecliptic_to_equatorial(ld.longitude, 0.0, obliq)
+        ra, dec = ecliptic_to_equatorial(ld, 0.0, obliq)
         gmst_deg = apparent_sidereal_time_at(jd_ut, longitude=0.0)
         return _acg_lines(
             {"Lilith": (ra, dec)}, gmst_deg, lat_step=lat_step, jd_ut=jd_ut
@@ -93,7 +97,7 @@ def _lilith_acg_lines(jd_ut: float, lat_step: float) -> list[Any]:
 
 def _local_space_list(chart: Any, lat: float, lon: float, bodies: list[str]) -> list[dict[str, Any]]:
     """Birth-place Local Space rays, one per body, as GeoJSON LineStrings."""
-    from moira.local_space import local_space_from_chart
+    from swe_engine import local_space_from_chart
 
     results = local_space_from_chart(chart, lat, lon, bodies=bodies)
     out: list[dict[str, Any]] = []
@@ -126,7 +130,7 @@ def _paran_list(
     bodies: list[str],
 ) -> list[dict[str, Any]]:
     """Active natal parans, each placed at the intersection of its two ACG lines."""
-    from moira.parans import natal_parans
+    from swe_engine import natal_parans
 
     try:
         prs = natal_parans(bodies, jd_ut, lat, lon, orb_minutes=4.0)
@@ -185,8 +189,7 @@ def generate_acg(
     _minor_bodies = {b for b in calc_bodies if b not in BODIES}
     _planet_bodies = [b for b in calc_bodies if b not in _minor_bodies]
 
-    from moira.astrocartography import acg_from_chart, subplanetary_from_chart
-    from moira.chart import create_chart
+    from swe_engine import acg_from_chart, subplanetary_from_chart, create_chart
 
     jd_ut = jd_from_iso(iso_datetime)
 
@@ -340,15 +343,14 @@ def _shorter_arc_midpoint(lon_a: float, lon_b: float) -> float:
 def _ra_dec_for_longitude(
     longitude: float, latitude: float, jd_tt: float
 ) -> tuple[float, float]:
-    from moira.coordinates import ecliptic_to_equatorial
-    from moira.obliquity import true_obliquity
+    from swe_engine import ecliptic_to_equatorial, true_obliquity
 
     obliq = true_obliquity(jd_tt)
     return ecliptic_to_equatorial(longitude, latitude, obliq)
 
 
 def _gmst_deg(jd_ut: float) -> float:
-    from moira.julian import apparent_sidereal_time_at
+    from swe_engine import apparent_sidereal_time_at
 
     return apparent_sidereal_time_at(jd_ut, longitude=0.0)
 
@@ -367,8 +369,7 @@ def generate_transit_acg(
     if _HAS_CHIRON and "Chiron" not in calc_bodies:
         calc_bodies.append("Chiron")
     try:
-        from moira.astrocartography import acg_from_chart
-        from moira.chart import create_chart
+        from swe_engine import acg_from_chart, create_chart
 
         jd_ut = jd_from_iso(transit_iso)
         with moira_reader():
@@ -394,8 +395,7 @@ def generate_progressed_acg(
     if _HAS_CHIRON and "Chiron" not in calc_bodies:
         calc_bodies.append("Chiron")
     try:
-        from moira.astrocartography import acg_lines
-        from moira.planets import sky_position_at
+        from swe_engine import acg_lines, sky_position_at
 
         birth_jd = jd_from_iso(birth_iso)
         prog_jd = birth_jd + float(age_years)
@@ -434,8 +434,7 @@ def generate_fixed_star_lines(
     """MC/IC/ASC/DSC ACG lines for the brightest classical fixed stars."""
     names = names or _FIXED_STAR_NAMES
     try:
-        from moira.astrocartography import acg_lines
-        from moira.stars import star_at
+        from swe_engine import acg_lines, star_at
 
         jd_ut = jd_from_iso(iso_datetime)
         jd_tt = _jd_tt(jd_ut)
@@ -487,8 +486,7 @@ def generate_midpoint_lines(
     ]
     pairs = pairs or default_pairs
     try:
-        from moira.astrocartography import acg_lines
-        from moira.chart import create_chart
+        from swe_engine import acg_lines, create_chart
 
         jd_ut = jd_from_iso(iso_datetime)
         jd_tt = _jd_tt(jd_ut)
@@ -627,7 +625,7 @@ def generate_geodetic(
     the 12 sign-boundary meridians.
     """
     try:
-        from moira.chart import create_chart
+        from swe_engine import create_chart
 
         jd_ut = jd_from_iso(iso_datetime)
         with moira_reader():

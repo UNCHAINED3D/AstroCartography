@@ -15,14 +15,10 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from moira.chart import create_chart
+from swe_engine import create_chart
 from moira_engine import BODIES, jd_from_iso, moira_reader
-from moira.nodes import nodes_and_apsides_at
-try:
-    from moira import is_void_of_course as _is_voc
-except Exception:  # pragma: no cover - optional on some moira builds
-    def _is_voc(jd, reader=None, modern=False):
-        return False
+from swe_engine import nodes_and_apsides_at
+from swe_engine import is_void_of_course as _is_voc
 
 # ---- Scoring weights -------------------------------------------------------
 BENEFICIANS = {'Jupiter', 'Venus', 'Sun'}

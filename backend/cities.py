@@ -246,7 +246,7 @@ def rank_cities_for_birth(
 
     relocated: dict[str, dict[str, Any]] = {}
     try:
-        from moira.chart import create_chart
+        from swe_engine import create_chart
         from moira_engine import jd_from_iso, moira_reader
 
         jd_ut = jd_from_iso(iso_datetime)

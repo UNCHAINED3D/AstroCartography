@@ -46,7 +46,6 @@
     }
   ],
   "env": {
-    "MOIRA_KERNEL_PATH": "/tmp/de440.bsp",
     "PYTHON_VERSION": "3.11"
   }
 }
