@@ -252,14 +252,25 @@
     <!-- Right side tabs wrapper -->
     <aside id="rightPanel">
       <div class="panel-tabs">
-        <button type="button" class="tab-btn active" id="tabIntel">Location Intel</button>
-        <button type="button" class="tab-btn" id="tabTopCities">Best Cities</button>
-        <button type="button" class="tab-btn" id="tabTravel">Travel Timing</button>
+        <button type="button" class="tab-btn active" id="tabIntel">Discover</button>
+        <button type="button" class="tab-btn" id="tabTopCities">Places</button>
+        <button type="button" class="tab-btn" id="tabTravel">Travel</button>
+        <button type="button" class="tab-btn" id="tabReport">Report</button>
       </div>
 
       <div id="tabContentIntel" class="tab-content active">
+        <div class="discover-header">
+          <div class="cities-tab-title"><span class="cities-star">✦</span><span>Discover Your Travel Signature</span></div>
+          <p class="cities-tab-sub">Your personalized travel narrative, emotional themes, and conscious travel style.</p>
+          <div class="discover-actions">
+            <button type="button" class="ghost-btn" id="refreshSignature">Refresh signature</button>
+          </div>
+        </div>
+        <div id="signaturePreview">
+          <p class="report-empty">Generate your chart to reveal your travel signature.</p>
+        </div>
         <div id="report">
-          <p class="report-empty">Hover the globe or map to preview a place. Double-click to pin a full analysis.</p>
+          <p class="report-empty">Hover a line to preview its meaning. Pin a place to see its narrative.</p>
         </div>
       </div>
 
@@ -349,17 +360,84 @@
            </label>
            <label style="display:block;margin-top:6px;"><input type="checkbox" id="useGroupTiming"> Use group scoring</label>
          </div>
-         <div class="travel-tab-header" style="margin-top:12px;">
-           <div class="cities-tab-title"><span class="cities-star">✦</span><span>Trip Planner</span></div>
-           <p class="cities-tab-sub">Optimize a multi-stop trip from your pinned places.</p>
-           <div class="row-2">
-             <label>Total days <input type="number" id="tripTotalDays" value="14" min="3" max="60" /></label>
-             <label>Start <input type="date" id="tripStart" /></label>
-           </div>
-           <button type="button" id="planTrip" class="ghost-btn full">Plan trip from pins</button>
-         </div>
-         <div id="tripPlanList"></div>
-      </div>
+<div class="travel-tab-header" style="margin-top:12px;">
+            <div class="cities-tab-title"><span class="cities-star">✦</span><span>Trip Planner</span></div>
+            <p class="cities-tab-sub">Optimize a multi-stop trip from your pinned places.</p>
+            <div class="row-2">
+              <label>Total days <input type="number" id="tripTotalDays" value="14" min="3" max="60" /></label>
+              <label>Start <input type="date" id="tripStart" /></label>
+            </div>
+            <button type="button" id="planTrip" class="ghost-btn full">Plan trip from pins</button>
+          </div>
+          <div id="tripPlanList"></div>
+
+          <div class="travel-tab-header" style="margin-top:12px;">
+            <div class="cities-tab-title"><span class="cities-star">✦</span><span>Couple / Group Narrative</span></div>
+            <p class="cities-tab-sub">Use saved companions to explore how a place may feel together.</p>
+            <div id="coupleGroupPreview" class="couple-group-preview"></div>
+          </div>
+        </div>
+
+        <div id="tabContentReport" class="tab-content">
+          <div class="travel-tab-header">
+            <div class="cities-tab-title"><span class="cities-star">✦</span><span>Report Builder</span></div>
+            <p class="cities-tab-sub">Build a free personalized narrative PDF with print / Save as PDF.</p>
+            <div class="report-form">
+              <label>Report name <input type="text" id="reportName" placeholder="My Astrocartography Report" /></label>
+              <div class="row-2">
+                <label>Travel style
+                  <select id="reportTravelStyle">
+                    <option value="balanced">Balanced</option>
+                    <option value="romantic">Romantic</option>
+                    <option value="healing">Healing</option>
+                    <option value="adventure">Adventure</option>
+                    <option value="career">Career</option>
+                    <option value="spiritual">Spiritual</option>
+                  </select>
+                </label>
+                <label>Pace
+                  <select id="reportTravelPace">
+                    <option value="slow">Slow</option>
+                    <option value="moderate" selected>Moderate</option>
+                    <option value="packed">Packed</option>
+                  </select>
+                </label>
+              </div>
+              <label>Interests <input type="text" id="reportInterests" placeholder="food, art, nature, nightlife" /></label>
+              <div class="row-2">
+                <label>Context
+                  <select id="reportContext">
+                    <option value="solo">Solo</option>
+                    <option value="couple">Couple</option>
+                    <option value="friends">Friends</option>
+                    <option value="family">Family</option>
+                  </select>
+                </label>
+                <label>Desired feeling
+                  <select id="reportFeeling">
+                    <option value="healing">Healing</option>
+                    <option value="romance">Romance</option>
+                    <option value="career">Career</option>
+                    <option value="adventure">Adventure</option>
+                    <option value="rest">Rest</option>
+                    <option value="creativity">Creativity</option>
+                  </select>
+                </label>
+              </div>
+              <label>Budget comfort
+                <select id="reportBudget">
+                  <option value="budget">Budget</option>
+                  <option value="mid" selected>Mid-range</option>
+                  <option value="comfort">Comfort</option>
+                </select>
+              </label>
+              <label>Notes <textarea id="reportNotes" rows="3" placeholder="What do you want from this trip?"></textarea></label>
+              <button type="button" id="buildReportPreview" class="ghost-btn full">Preview full narrative</button>
+              <button type="button" id="printReport" class="ghost-btn full">🖨 Print / PDF report</button>
+            </div>
+            <div id="reportPreview"></div>
+          </div>
+        </div>
     </aside>
 
     <!-- Floating Dock Controls (bottom-center) -->

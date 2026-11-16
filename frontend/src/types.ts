@@ -154,6 +154,121 @@ export interface AnalysisInterpretations {
   overall: string;
 }
 
+export interface CityNarrative {
+  city: string;
+  country: string;
+  region?: string;
+  headline: string;
+  emotional_weather: string;
+  focus_domain: string;
+  dominant_planets: string[];
+  dominant_angle: string;
+  may_feel: string[];
+  may_notice: string[];
+  may_resist: string[];
+  shadow_pattern: string;
+  growth_invitation: string;
+  best_for: string[];
+  conscious_practice: string;
+  journal_prompts: string[];
+  catch_the_feeling: {
+    feeling: string;
+    exercise: string;
+  };
+  activities: string[];
+  atmosphere: Record<string, string>;
+  neighborhoods: string[];
+  travel_advice: string;
+  return_integration: string;
+  ascendant_sign?: string;
+  relocated_house_theme?: Record<string, string>;
+  disclaimer: string;
+}
+
+export interface TravelNarrative {
+  date?: string;
+  destination?: string;
+  score: number;
+  mood: string;
+  narrative: string;
+  best_for: string[];
+  avoid: string[];
+  ritual: string;
+  influences?: string[];
+  warnings?: string[];
+}
+
+export interface PersonalSignature {
+  name: string;
+  headline: string;
+  core_themes: string[];
+  emotional_needs: string[];
+  travel_style: string;
+  driving_planets: string[];
+  what_to_seek: string[];
+  what_to_balance: string[];
+  journal_prompts: string[];
+}
+
+export interface CoupleNarrative {
+  headline: string;
+  shared_themes: string[];
+  relationship_gift: string;
+  relationship_shadow: string;
+  best_activities: string[];
+  conflict_forecast: string;
+  ritual: string;
+  disclaimer: string;
+}
+
+export interface GroupNarrative {
+  headline: string;
+  group_themes: string[];
+  per_person: { name: string; need: string; may_overstimulate: string; role: string }[];
+  shared_activities: string[];
+  avoid: string[];
+  group_ritual: string;
+  disclaimer: string;
+}
+
+export interface ItineraryDay {
+  day: number;
+  city: string;
+  theme: string;
+  emotional_focus: string;
+  morning_intention: string;
+  activity_type: string;
+  conscious_task: string;
+  evening_reflection: string;
+  avoid: string;
+  arrival_date?: string;
+  length_days?: number;
+  score?: number;
+}
+
+export interface FullReport {
+  meta: {
+    name: string;
+    birth: { datetime: string; latitude: number; longitude: number };
+    focus: string;
+    generated_at: string | null;
+    disclaimer: string;
+  };
+  signature: PersonalSignature;
+  destinations: CityNarrative[];
+  selected_city?: CityNarrative | null;
+  couple?: CoupleNarrative | null;
+  group?: GroupNarrative | null;
+  travel_timing: TravelNarrative[];
+  itinerary: ItineraryDay[];
+  integration: {
+    headline: string;
+    prompts: string[];
+  };
+  travel_style: string;
+  interests: string[];
+}
+
 export interface LocationAnalysis {
   location: { latitude: number; longitude: number };
   relocation: RelocationBlock;
@@ -164,6 +279,7 @@ export interface LocationAnalysis {
   house_region: HouseRegion;
   domain_scores: DomainScores;
   interpretations: AnalysisInterpretations;
+  narrative?: CityNarrative;
 }
 
 export interface PrimaryInfluence {
@@ -200,6 +316,13 @@ export interface TopCity {
     domain: string;
     points: number;
   }[];
+  narrative?: CityNarrative;
+  emotional_headline?: string;
+  best_for?: string[];
+  feel_profile?: string[];
+  shadow_pattern?: string;
+  conscious_practice?: string;
+  recommended_duration?: string;
 }
 
 export interface Crossing {
@@ -229,6 +352,7 @@ export interface TravelDay {
   stay_score?: number;
   departure_score?: number | null;
   warnings?: string[];
+  narrative?: TravelNarrative;
 }
 
 export interface TravelTimingRequest {
@@ -276,6 +400,7 @@ export interface TripPlanResponse {
     score: number;
     daily: { date: string; score: number }[];
   }[];
+  experiential_itinerary?: ItineraryDay[];
 }
 
 export type TravelTimingDay = TravelDay;

@@ -1,4 +1,4 @@
-import type { ACGRequest, ACGResponse, BirthEntry, LocationAnalysis, TopCity, OverlayResponse, TransitRequest, ProgressedRequest, GeodeticRequest, FixedStarsRequest, MidpointsRequest, CrossingResponse, TravelDay, TravelTimingRequest, GroupTravelDay, TripPlanRequest, TripPlanResponse } from './types';
+import type { ACGRequest, ACGResponse, BirthEntry, LocationAnalysis, TopCity, OverlayResponse, TransitRequest, ProgressedRequest, GeodeticRequest, FixedStarsRequest, MidpointsRequest, CrossingResponse, TravelDay, TravelTimingRequest, GroupTravelDay, TripPlanRequest, TripPlanResponse, PersonalSignature, CoupleNarrative, GroupNarrative, FullReport } from './types';
 
 const API_BASE = '/api';
 
@@ -217,6 +217,90 @@ export async function fetchTripPlan(req: TripPlanRequest): Promise<TripPlanRespo
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+export async function fetchTravelSignature(req: {
+  birth: { datetime: string; latitude: number; longitude: number };
+  name: string;
+  preferences?: Record<string, unknown>;
+}): Promise<PersonalSignature> {
+  const res = await fetch(`${API_BASE}/travel-signature`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCoupleNarrative(req: {
+  birth_a: { datetime: string; latitude: number; longitude: number };
+  birth_b: { datetime: string; latitude: number; longitude: number };
+  name_a: string;
+  name_b: string;
+  city_name?: string;
+  country?: string;
+}): Promise<CoupleNarrative> {
+  const res = await fetch(`${API_BASE}/couple-narrative`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchGroupNarrative(req: {
+  births: { datetime: string; latitude: number; longitude: number }[];
+  names: string[];
+  city_name?: string;
+  country?: string;
+}): Promise<GroupNarrative> {
+  const res = await fetch(`${API_BASE}/group-narrative`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchFullReport(req: {
+  birth: { datetime: string; latitude: number; longitude: number };
+  name: string;
+  preferences?: Record<string, unknown>;
+  focus?: string;
+  top_city_limit?: number;
+  selected_city?: { name: string; country?: string; latitude: number; longitude: number };
+  second_birth?: { datetime: string; latitude: number; longitude: number };
+  companions?: { datetime: string; latitude: number; longitude: number }[];
+  travel_start?: string;
+  travel_days?: number;
+}): Promise<FullReport> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120000);
+  try {
+    const res = await fetch(`${API_BASE}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (data?.detail) detail = data.detail;
+      } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json();
+  } catch (err) {
+    if ((err as any)?.name === 'AbortError') throw new Error('Report generation timed out (120s).');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 

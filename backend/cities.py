@@ -28,6 +28,7 @@ from scoring_common import (
     SLIDER_TO_DOMAIN,
     line_domain_weight,
 )
+from narrative.compose import compose_city_narrative
 
 # Built-in dataset of major world cities across all continents & travel hotspots
 WORLD_CITIES = [
@@ -399,6 +400,22 @@ def rank_cities_for_birth(
                 "parans": round(paran_points, 1),
             }
             result["house_placements"] = house_placements[:4]
+        result["narrative"] = compose_city_narrative(
+            city_name=city["name"],
+            country=city["country"],
+            region=city["region"],
+            focus=focus,
+            domain_scores=result["scores"],
+            nearest_acg=top_influences,
+            parans=[],
+            relocated={"planets": house_placements[:4], "angles": {}},
+        )
+        result["emotional_headline"] = result["narrative"]["headline"]
+        result["best_for"] = result["narrative"]["best_for"]
+        result["feel_profile"] = result["narrative"]["may_feel"]
+        result["shadow_pattern"] = result["narrative"]["shadow_pattern"]
+        result["conscious_practice"] = result["narrative"]["conscious_practice"]
+        result["recommended_duration"] = "3-5 days for a visit; longer stays need a separate relocation lens."
         results.append(result)
 
     # Sort cities by overall score descending

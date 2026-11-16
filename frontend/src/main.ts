@@ -1,10 +1,10 @@
 import './style.css';
-import { fetchACG, fetchBirths, saveBirth, deleteBirth, fetchAnalysis, fetchTopCities, fetchTransitACG, fetchProgressedACG, fetchGeodetic, fetchFixedStars, fetchMidpoints, fetchCrossings, fetchSolarReturn, fetchLunarReturn, fetchTravelTiming, fetchGroupTravelTiming, fetchTripPlan } from './api';
+import { fetchACG, fetchBirths, saveBirth, deleteBirth, fetchAnalysis, fetchTopCities, fetchTransitACG, fetchProgressedACG, fetchGeodetic, fetchFixedStars, fetchMidpoints, fetchCrossings, fetchSolarReturn, fetchLunarReturn, fetchTravelTiming, fetchGroupTravelTiming, fetchTripPlan, fetchTravelSignature, fetchCoupleNarrative, fetchGroupNarrative, fetchFullReport } from './api';
 import { initGlobe } from './globe';
 import { initMap2D } from './map2d';
 import type { HoverInfo, ClickInfo } from './globe';
 import { renderReport, renderHoverPreview, clearReport, renderTopCitiesCards, renderCitiesSkeleton, renderTravelDays, renderTravelSkeleton, scoreColor } from './panel';
-import type { ACGResponse, BirthEntry, TopCity } from './types';
+import type { ACGResponse, BirthEntry, TopCity, PersonalSignature, CoupleNarrative, GroupNarrative } from './types';
 import {
   acgToGeoJSON,
   acgToKML,
@@ -161,22 +161,30 @@ function applyGoalFilter(goal: string) {
 const tabIntel = $('tabIntel');
 const tabTopCities = $('tabTopCities');
 const tabTravel = $('tabTravel');
+const tabReport = $('tabReport');
 const tabContentIntel = $('tabContentIntel');
 const tabContentTopCities = $('tabContentTopCities');
 const tabContentTravel = $('tabContentTravel');
+const tabContentReport = $('tabContentReport');
 
-function switchTab(tab: 'intel' | 'cities' | 'travel'): void {
+function switchTab(tab: 'intel' | 'cities' | 'travel' | 'report'): void {
   tabIntel?.classList.toggle('active', tab === 'intel');
   tabTopCities?.classList.toggle('active', tab === 'cities');
   tabTravel?.classList.toggle('active', tab === 'travel');
+  tabReport?.classList.toggle('active', tab === 'report');
   tabContentIntel?.classList.toggle('active', tab === 'intel');
   tabContentTopCities?.classList.toggle('active', tab === 'cities');
   tabContentTravel?.classList.toggle('active', tab === 'travel');
+  tabContentReport?.classList.toggle('active', tab === 'report');
 }
 
 tabIntel?.addEventListener('click', () => switchTab('intel'));
 tabTopCities?.addEventListener('click', () => { switchTab('cities'); void loadTopCities(); });
 tabTravel?.addEventListener('click', () => switchTab('travel'));
+tabReport?.addEventListener('click', () => switchTab('report'));
+
+$('refreshSignature')?.addEventListener('click', () => { void loadPersonalSignature(); });
+$('buildReportPreview')?.addEventListener('click', () => { void buildReportPreview(); });
 
 // ---- Travel timing (electional) -------------------------------------------
 function activePin(): Pin | null {
@@ -370,6 +378,9 @@ let lastACGData: ACGResponse | null = null;
 // Most recent top-cities + analysis — used by the PDF report.
 let lastTopCities: import('./types').TopCity[] = [];
 let lastAnalysisData: import('./types').LocationAnalysis | null = null;
+let currentSignature: PersonalSignature | null = null;
+let currentCoupleNarrative: CoupleNarrative | null = null;
+let currentGroupNarrative: GroupNarrative | null = null;
 
 // ---- Dual-chart compare mode ---------------------------------------------
 let savedBirthsCache: BirthEntry[] = [];
@@ -460,6 +471,95 @@ async function runAnalysis(lat: number, lng: number, isPinned: boolean): Promise
   }
 }
 
+async function loadPersonalSignature(): Promise<void> {
+  const b = currentBirth();
+  if (!b) return;
+  try {
+    currentSignature = await fetchTravelSignature({
+      birth: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
+      name: ($('name') as HTMLInputElement)?.value?.trim() || 'Traveler',
+      preferences: reportPreferences(),
+    });
+    renderSignature();
+  } catch (err) {
+    setStatus(`Travel signature error: ${(err as Error).message}`, true);
+  }
+}
+
+function reportPreferences(): Record<string, unknown> {
+  return {
+    travel_style: ($('reportTravelStyle') as HTMLSelectElement)?.value || 'balanced',
+    travel_pace: ($('reportTravelPace') as HTMLSelectElement)?.value || 'moderate',
+    interests: (($('reportInterests') as HTMLInputElement)?.value || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    travel_context: ($('reportContext') as HTMLSelectElement)?.value || 'solo',
+    desired_feeling: ($('reportFeeling') as HTMLSelectElement)?.value || 'healing',
+    budget_comfort: ($('reportBudget') as HTMLSelectElement)?.value || 'mid',
+    notes: ($('reportNotes') as HTMLTextAreaElement)?.value || '',
+  };
+}
+
+function renderSignature(): void {
+  const root = $('signaturePreview');
+  if (!root) return;
+  if (!currentSignature) {
+    root.innerHTML = '<p class="report-empty">Generate a chart to see your travel signature.</p>';
+    return;
+  }
+  root.innerHTML = `
+    <div class="signature-headline">${currentSignature.headline}</div>
+    <div class="signature-tags">${(currentSignature.core_themes || []).map((x) => `<span class="pill">${x}</span>`).join('')}</div>
+    <div class="signature-block"><b>What to seek</b><div>${(currentSignature.what_to_seek || []).join(' · ')}</div></div>
+    <div class="signature-block"><b>What to balance</b><div>${(currentSignature.what_to_balance || []).join(' · ')}</div></div>
+  `;
+}
+
+async function loadCoupleNarrative(cityName = '', country = ''): Promise<void> {
+  const b = currentBirth();
+  const other = compareBirth;
+  if (!b || !other) {
+    currentCoupleNarrative = null;
+    return;
+  }
+  try {
+    currentCoupleNarrative = await fetchCoupleNarrative({
+      birth_a: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
+      birth_b: { datetime: other.datetime, latitude: other.latitude, longitude: other.longitude },
+      name_a: ($('name') as HTMLInputElement)?.value?.trim() || 'You',
+      name_b: other.name || 'Partner',
+      city_name: cityName,
+      country,
+    });
+  } catch {
+    currentCoupleNarrative = null;
+  }
+}
+
+async function loadGroupNarrative(cityName = '', country = ''): Promise<void> {
+  const b = currentBirth();
+  const ids = Array.from(($('companionSelect') as HTMLSelectElement | null)?.selectedOptions || []).map((o) => o.value);
+  const companions = savedBirthsCache.filter((x) => ids.includes(String(x.id)));
+  if (!b || !companions.length) {
+    currentGroupNarrative = null;
+    return;
+  }
+  try {
+    currentGroupNarrative = await fetchGroupNarrative({
+      births: [
+        { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
+        ...companions.map((c) => ({ datetime: c.datetime, latitude: c.latitude, longitude: c.longitude })),
+      ],
+      names: [($('name') as HTMLInputElement)?.value?.trim() || 'You', ...companions.map((c) => c.name)],
+      city_name: cityName,
+      country,
+    });
+  } catch {
+    currentGroupNarrative = null;
+  }
+}
+
 globe.setHoverHandler((info: HoverInfo | null) => {
   // Only show a preview when hovering directly over an ACG line.
   // Globe/point hover no longer fires runAnalysis — the Pin tool is required.
@@ -543,7 +643,7 @@ async function loadTopCities(): Promise<void> {
       undefined,
       ($('regionSelect') as HTMLSelectElement | null)?.value || undefined,
     );
-    if (reqId !== topCitiesReqId) return;
+if (reqId !== topCitiesReqId) return;
     lastTopCities = cities;
     renderTopCitiesCards(cities, (city: TopCity) => {
       // Fly to city & inspect
@@ -552,6 +652,8 @@ async function loadTopCities(): Promise<void> {
 
       const clickInfo: ClickInfo = { type: 'click', lat: city.latitude, lng: city.longitude };
       handleMapClick(clickInfo);
+      void loadCoupleNarrative(city.name, city.country);
+      void loadGroupNarrative(city.name, city.country);
     }, currentGoalFocus);
   } catch (err) {
     if (reqId !== topCitiesReqId) return;
@@ -724,6 +826,68 @@ function renderPins(): void {
   });
   syncPins();
   refreshTravelPinSelect();
+  renderCoupleGroupPreview();
+}
+
+function renderCoupleGroupPreview(): void {
+  const root = $('coupleGroupPreview');
+  if (!root) return;
+  const blocks: string[] = [];
+  if (currentSignature) {
+    blocks.push(`<div class="couple-block"><div class="narrative-kicker">TRAVEL SIGNATURE</div><div class="narrative-headline">${currentSignature.headline}</div></div>`);
+  }
+  if (currentCoupleNarrative) {
+    blocks.push(`<div class="couple-block"><div class="narrative-kicker">COUPLE NARRATIVE</div><div class="narrative-headline">${currentCoupleNarrative.headline}</div><div class="narrative-body">${currentCoupleNarrative.relationship_gift}</div></div>`);
+  }
+  if (currentGroupNarrative) {
+    blocks.push(`<div class="couple-block"><div class="narrative-kicker">GROUP NARRATIVE</div><div class="narrative-headline">${currentGroupNarrative.headline}</div><div class="narrative-body">${currentGroupNarrative.group_ritual}</div></div>`);
+  }
+  root.innerHTML = blocks.join('') || '<p class="report-empty">Select saved companions to generate a couple or group narrative.</p>';
+}
+
+async function buildReportPreview(): Promise<void> {
+  const birth = currentBirth();
+  if (!birth) { setStatus('Draw your chart first.', true); return; }
+  const root = $('reportPreview');
+  if (!root) return;
+  root.innerHTML = '<p class="report-empty">Building narrative report…</p>';
+  try {
+    const selected = lastAnalysisData?.location
+      ? {
+          name: lastAnalysisData.narrative?.city || 'Pinned location',
+          country: lastAnalysisData.narrative?.country || '',
+          latitude: lastAnalysisData.location.latitude,
+          longitude: lastAnalysisData.location.longitude,
+        }
+      : undefined;
+    const report = await fetchFullReport({
+      birth,
+      name: ($('name') as HTMLInputElement)?.value?.trim() || 'Birth Chart',
+      preferences: reportPreferences(),
+      focus: currentGoalFocus,
+      top_city_limit: Math.max(3, Math.min(20, lastTopCities.length || 10)),
+      selected_city: selected,
+      second_birth: compareBirth
+        ? { datetime: compareBirth.datetime, latitude: compareBirth.latitude, longitude: compareBirth.longitude }
+        : undefined,
+      companions: savedBirthsCache
+        .filter((e) => Array.from(($('companionSelect') as HTMLSelectElement | null)?.selectedOptions || []).some((o) => o.value === String(e.id)))
+        .map((e) => ({ datetime: e.datetime, latitude: e.latitude, longitude: e.longitude })),
+      travel_start: ($('travelStart') as HTMLInputElement)?.value || undefined,
+      travel_days: parseInt(($('travelDays') as HTMLInputElement)?.value || '30') || 30,
+    });
+    root.innerHTML = `
+      <div class="report-preview-card">
+        <div class="narrative-kicker">REPORT PREVIEW</div>
+        <div class="narrative-headline">${report.signature.headline}</div>
+        <div class="narrative-body">${report.destinations.slice(0, 3).map((d) => `<p><b>${d.city}</b> — ${d.headline}</p>`).join('')}</div>
+        <div class="report-actions"><button type="button" class="ghost-btn" id="previewPrintReport">🖨 Print / PDF</button></div>
+      </div>
+    `;
+    ($('previewPrintReport') as HTMLButtonElement | null)?.addEventListener('click', () => ($('printReport') as HTMLButtonElement)?.click());
+  } catch (err) {
+    root.innerHTML = `<p class="report-empty">Report preview failed: ${(err as Error).message}</p>`;
+  }
 }
 
 function deletePin(id: string): void {
@@ -1168,6 +1332,8 @@ async function drawCurrentBirth(): Promise<void> {
     const planetCount = new Set(data.lines.map((l) => l.planet)).size;
     setStatus(`Rendered ${data.lines.length} lines for ${planetCount} planets.`);
 
+    await loadPersonalSignature();
+
     // Load top cities recommendations for current birth
     void loadTopCities();
   } catch (err) {
@@ -1427,7 +1593,7 @@ $('exportKml')?.addEventListener('click', () => {
   setStatus(`Exported ${lastACGData.lines.length} lines as KML.`);
 });
 
-$('printReport')?.addEventListener('click', () => {
+$('printReport')?.addEventListener('click', async () => {
   const birth = currentBirth();
   if (!birth) {
     setStatus('Draw your chart first before printing a report.', true);
@@ -1436,29 +1602,52 @@ $('printReport')?.addEventListener('click', () => {
   const container = $('printReportContainer');
   if (!container) { window.print(); return; }
 
-  // Capture globe image (Cesium canvas)
   let mapImgDataUrl = '';
   try { mapImgDataUrl = globe.captureImage(); } catch { /* optional */ }
 
-  // Import and invoke the report builder
-  import('./panel').then(({ buildFullPrintReportHTML }) => {
+  try {
+    setStatus('Building your narrative report…');
+    const selected = lastAnalysisData?.location
+      ? {
+          name: lastAnalysisData.narrative?.city || 'Pinned location',
+          country: lastAnalysisData.narrative?.country || '',
+          latitude: lastAnalysisData.location.latitude,
+          longitude: lastAnalysisData.location.longitude,
+        }
+      : undefined;
+    const report = await fetchFullReport({
+      birth,
+      name: ($('name') as HTMLInputElement)?.value?.trim() || 'Birth Chart',
+      preferences: reportPreferences(),
+      focus: currentGoalFocus,
+      top_city_limit: Math.max(3, Math.min(20, lastTopCities.length || 10)),
+      selected_city: selected,
+      second_birth: compareBirth
+        ? { datetime: compareBirth.datetime, latitude: compareBirth.latitude, longitude: compareBirth.longitude }
+        : undefined,
+      companions: savedBirthsCache
+        .filter((e) => Array.from(($('companionSelect') as HTMLSelectElement | null)?.selectedOptions || []).some((o) => o.value === String(e.id)))
+        .map((e) => ({ datetime: e.datetime, latitude: e.latitude, longitude: e.longitude })),
+      travel_start: ($('travelStart') as HTMLInputElement)?.value || undefined,
+      travel_days: parseInt(($('travelDays') as HTMLInputElement)?.value || '30') || 30,
+    });
+    const { buildFullPrintReportHTML } = await import('./panel');
     container.innerHTML = buildFullPrintReportHTML({
       birthName: ($('name') as HTMLInputElement)?.value?.trim() || 'Birth Chart',
       birth,
       mapImgDataUrl,
       topCities: lastTopCities.length ? lastTopCities : undefined,
       lastAnalysis: lastAnalysisData,
+      report,
     });
-    // Force a paint before opening print dialog to ensure content is rendered
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.print();
       });
     });
-  }).catch(() => {
-    // Fallback: just print as-is
-    window.print();
-  });
+  } catch (err) {
+    setStatus(`Report error: ${(err as Error).message}`, true);
+  }
 });
 
 // ---------------------------------------------------------------------------

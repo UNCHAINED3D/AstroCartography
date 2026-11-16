@@ -9,6 +9,7 @@ from typing import Any
 from moira_engine import jd_from_iso
 from electional import rate_travel_window, _iso_to_jd, _jd_to_datetime
 from geometry import haversine_km
+from narrative.compose import compose_itinerary
 
 
 def _jd_to_date_str(jd: float) -> str:
@@ -148,4 +149,9 @@ def plan_trip(req) -> dict[str, Any]:
     return {
         'total_score': round(best_score, 1) if best_score != INF else 0.0,
         'itinerary': itinerary,
+        'experiential_itinerary': compose_itinerary(
+            itinerary,
+            travel_style=getattr(req, 'travel_style', 'balanced') if hasattr(req, 'travel_style') else 'balanced',
+            interests=getattr(req, 'interests', None) if hasattr(req, 'interests') else None,
+        ),
     }

@@ -1787,6 +1787,38 @@ body.fs-hide-ui * {
   color: #93c5fd;
 }
 
+/* ---- Narrative UI additions ---- */
+.tab-btn { transition: color 0.15s ease, background 0.15s ease; }
+.tab-btn.active { background: var(--accent-soft); color: var(--accent); }
+.city-emotional-headline { margin-top: 8px; font-size: 0.82rem; line-height: 1.35; color: var(--text); }
+.city-narrative-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.city-narrative-tags .pill { font-size: 0.68rem; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--muted); }
+.signature-headline { font-size: 0.95rem; line-height: 1.4; margin-bottom: 10px; }
+.signature-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.signature-tags .pill { font-size: 0.68rem; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.signature-block { margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; font-size: 0.78rem; color: var(--muted); }
+.signature-block b { color: var(--text); display: block; margin-bottom: 3px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.discover-header, .travel-tab-header { padding: 14px; border-bottom: 1px solid var(--border); }
+.discover-actions { margin-top: 8px; }
+.travel-narrative-card, .couple-block, .report-preview-card { margin: 10px 14px; padding: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; }
+.narrative-kicker { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.narrative-headline { font-size: 0.9rem; line-height: 1.35; font-weight: 600; margin-bottom: 6px; }
+.narrative-body { font-size: 0.82rem; line-height: 1.4; color: var(--muted); margin-bottom: 5px; }
+.narrative-callout { margin: 8px 0; padding: 9px; background: var(--accent-soft); border: 1px solid var(--accent-soft); border-radius: 8px; }
+.narrative-callout-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 3px; font-weight: 700; }
+.narrative-callout-text { font-size: 0.82rem; line-height: 1.4; margin-bottom: 3px; }
+.couple-group-preview { display: grid; gap: 8px; }
+.report-form { display: grid; gap: 8px; margin-top: 10px; }
+.report-form label { margin-bottom: 0; }
+.report-form input, .report-form select, .report-form textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.04); color: var(--text); font-family: var(--font-sans); }
+.report-actions { margin-top: 8px; display: flex; gap: 8px; }
+.print-city-page { page-break-before: always; }
+.print-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.print-callout { margin: 8px 0; padding: 8px 10px; background: #f8fafc; border-left: 3px solid #2563eb; font-size: 11px; line-height: 1.45; }
+.print-lede { font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
+.print-small { font-size: 10.5px; line-height: 1.45; color: #334155; }
+.print-disclaimer { margin-top: 18px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; font-size: 9.5px; color: #475569; line-height: 1.45; }
+
 /* ---- Export & Share section ---- */
 .export-body { display: flex; flex-direction: column; gap: 6px; }
 
@@ -1927,10 +1959,22 @@ body.fs-hide-ui * {
     padding: 8px 10px;
   }
 
-  .print-guide-box h4 {
+.print-guide-box h4 {
     margin: 0 0 4px 0;
     font-size: 11px;
     color: #1e293b;
+  }
+
+  .print-two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .print-city-page {
+    page-break-before: always;
+  }
+
+  .print-callout {
+    page-break-inside: avoid;
   }
 }
 /* ---- Compare mode selector ---- */

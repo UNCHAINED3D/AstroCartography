@@ -1,4 +1,4 @@
-import type { LocationAnalysis, NearestLine, Paran, RelocationBlock, DomainScores, Crossing, TopCity } from './types';
+import type { LocationAnalysis, NearestLine, Paran, RelocationBlock, DomainScores, Crossing, TopCity, CityNarrative, FullReport } from './types';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -145,6 +145,24 @@ function renderScoreCard(scores: DomainScores): HTMLElement {
   return s;
 }
 
+function renderNarrative(narrative: CityNarrative): HTMLElement {
+  const s = section('Place narrative', narrative.headline);
+  s.appendChild(el('p', 'report-text', narrative.headline));
+  if (narrative.may_feel.length) {
+    const ul = el('ul', 'report-list');
+    narrative.may_feel.forEach((t) => ul.appendChild(bullet(t)));
+    s.appendChild(ul);
+  }
+  if (narrative.catch_the_feeling) {
+    const box = el('div', 'narrative-callout');
+    box.appendChild(el('div', 'narrative-callout-title', 'Catch the feeling'));
+    box.appendChild(el('div', 'narrative-callout-text', narrative.catch_the_feeling.feeling));
+    box.appendChild(el('div', 'narrative-callout-text', narrative.catch_the_feeling.exercise));
+    s.appendChild(box);
+  }
+  return s;
+}
+
 export function renderReport(
   data: LocationAnalysis,
   pinned = false,
@@ -175,6 +193,7 @@ export function renderReport(
 
   // Domain score card always shows at the top of the report.
   root.appendChild(renderScoreCard(data.domain_scores));
+  if (data.narrative) root.appendChild(renderNarrative(data.narrative));
 
   // Relocation only matters once a spot is pinned (a real relocated chart).
   if (pinned) root.appendChild(renderRelocation(data.relocation));
@@ -410,6 +429,17 @@ export function renderTopCitiesCards(
     headerRow.appendChild(scoreRing(city.overall_score, goalMeta.color));
     card.appendChild(headerRow);
 
+    const narrative = city.narrative;
+    if (narrative) {
+      const headline = el('div', 'city-emotional-headline', narrative.headline);
+      card.appendChild(headline);
+      if (narrative.best_for?.length) {
+        const tags = el('div', 'city-narrative-tags');
+        narrative.best_for.slice(0, 4).forEach((tag) => tags.appendChild(pill(tag)));
+        card.appendChild(tags);
+      }
+    }
+
     // Summary
     if (city.summary) {
       card.appendChild(el('p', 'city-summary', city.summary));
@@ -622,6 +652,17 @@ export function renderTravelDays(
    }
   container.appendChild(bestCard);
 
+  if (days[0]?.narrative) {
+    const narrativeCard = el('div', 'travel-narrative-card');
+    narrativeCard.innerHTML = `
+      <div class="narrative-kicker">TRAVEL NARRATIVE</div>
+      <div class="narrative-headline">${days[0].narrative.mood}</div>
+      <div class="narrative-body">${days[0].narrative.narrative}</div>
+      ${days[0].narrative.ritual ? `<div class="narrative-body"><b>Ritual:</b> ${days[0].narrative.ritual}</div>` : ''}
+    `;
+    container.appendChild(narrativeCard);
+  }
+
   // Score strip
   const strip = el('div', 'travel-strip');
   days.forEach((d) => {
@@ -667,64 +708,64 @@ export function buildFullPrintReportHTML(options: {
   mapImgDataUrl: string;
   topCities?: TopCity[];
   lastAnalysis?: LocationAnalysis | null;
+  report?: FullReport | null;
 }): string {
-  const { birthName, birth, mapImgDataUrl, topCities, lastAnalysis } = options;
-  const name = birthName.trim() || 'Birth Chart';
+  const { birthName, birth, mapImgDataUrl, topCities, lastAnalysis, report } = options;
+  const name = report?.meta?.name || birthName.trim() || 'Birth Chart';
   const genDate = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-  
   const m = birth.datetime.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
   const dateStr = m ? `${m[1]} at ${m[2]} UTC` : birth.datetime;
   const latStr = `${Math.abs(birth.latitude).toFixed(2)}°${birth.latitude >= 0 ? 'N' : 'S'}`;
   const lngStr = `${Math.abs(birth.longitude).toFixed(2)}°${birth.longitude >= 0 ? 'E' : 'W'}`;
 
-  let topCitiesRows = '';
-  if (topCities && topCities.length) {
-    topCitiesRows = topCities.slice(0, 10).map((c, idx) => {
-      const infs = (c.primary_influences || [])
-        .map((i) => `${i.planet} ${i.angle} (${i.distance_km} km)`)
-        .join(', ');
-      return `
-        <tr>
-          <td><b>#${idx + 1} ${c.name}</b></td>
-          <td>${c.country}</td>
-          <td><span class="print-score-badge">${c.overall_score}</span></td>
-          <td>${c.scores?.love ?? '—'}</td>
-          <td>${c.scores?.career ?? '—'}</td>
-          <td>${c.scores?.peace ?? '—'}</td>
-          <td>${c.scores?.growth ?? '—'}</td>
-          <td>${infs || 'Harmonious ambient energy'}</td>
-        </tr>
-      `;
-    }).join('');
-  }
+  const listBlock = (title: string, items: string[]) => items?.length
+    ? `<div class="print-callout"><b>${title}</b><ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`
+    : '';
 
-  let locationIntelHTML = '';
-  if (lastAnalysis) {
-    const loc = lastAnalysis.location;
-    const rel = lastAnalysis.relocation;
-    const interp = lastAnalysis.interpretations;
-
-    const relocAngles = rel?.angles
-      ? `ASC: ${rel.angles.asc.sign} | MC: ${rel.angles.mc.sign} | DSC: ${rel.angles.dsc.sign} | IC: ${rel.angles.ic.sign}`
-      : 'Standard relocated cusps';
-
-    const acgLines = (lastAnalysis.nearest_acg || [])
-      .map((l) => `<li><b>${l.planet} ${l.angle}</b> — ${l.distance_km} km (${l.strength})</li>`)
-      .join('');
-
-    locationIntelHTML = `
-      <div class="print-section">
-        <h3 class="print-section-title">📍 Pinned Location Intel (${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°)</h3>
-        <div style="font-size: 11px; margin-bottom: 8px;"><b>Relocated Angles:</b> ${relocAngles}</div>
-        ${interp?.overall ? `<p style="font-size: 11px; line-height: 1.4; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 10px;">${interp.overall}</p>` : ''}
-        ${acgLines ? `<div style="font-size: 11px;"><b>Proximity Lines:</b><ul>${acgLines}</ul></div>` : ''}
+  const destinationNarratives = report?.destinations?.length
+    ? report.destinations.map((city) => `
+      <div class="print-section print-city-page">
+        <h3 class="print-section-title">${city.city}${city.country ? `, ${city.country}` : ''}</h3>
+        <p class="print-lede">${city.headline}</p>
+        <div class="print-two-col">
+          <div>${listBlock('How it may feel', city.may_feel)}</div>
+          <div>${listBlock('What you may notice', city.may_notice)}</div>
+        </div>
+        ${listBlock('Shadow pattern', [city.shadow_pattern])}
+        ${listBlock('Growth invitation', [city.growth_invitation])}
+        ${listBlock('Best for', city.best_for)}
+        <div class="print-callout"><b>Catch the feeling:</b> ${city.catch_the_feeling.feeling}<br>${city.catch_the_feeling.exercise}</div>
+        ${listBlock('Journal prompts', city.journal_prompts)}
+        <div class="print-small"><b>Conscious practice:</b> ${city.conscious_practice}<br><b>Return integration:</b> ${city.return_integration}</div>
       </div>
-    `;
-  }
+    `).join('')
+    : '';
+
+  const topRows = topCities?.length
+    ? topCities.slice(0, report?.destinations.length || 10).map((c, idx) => `
+      <tr>
+        <td><b>#${idx + 1} ${c.name}</b></td>
+        <td>${c.country}</td>
+        <td><span class="print-score-badge">${c.overall_score}</span></td>
+        <td>${c.scores?.love ?? '—'}</td>
+        <td>${c.scores?.career ?? '—'}</td>
+        <td>${c.scores?.peace ?? '—'}</td>
+        <td>${c.scores?.growth ?? '—'}</td>
+        <td>${(c.primary_influences || []).map((i) => `${i.planet} ${i.angle}`).join(', ') || 'ambient harmony'}</td>
+      </tr>
+    `).join('')
+    : '';
+
+  const selected = report?.selected_city || lastAnalysis?.narrative;
+  const couple = report?.couple;
+  const group = report?.group;
+  const travel = report?.travel_timing || [];
+  const itinerary = report?.itinerary || [];
+  const signature = report?.signature;
 
   return `
     <div class="print-header">
-      <div class="print-brand">✶ ASTROCARTOGRAPHY RELOCATION REPORT</div>
+      <div class="print-brand">✶ ASTROCARTOGRAPHY NARRATIVE REPORT</div>
       <h1 class="print-title">${name}'s Astrocartography Profile</h1>
       <div class="print-meta-grid">
         <div><b>Birth Moment:</b> ${dateStr}</div>
@@ -733,57 +774,102 @@ export function buildFullPrintReportHTML(options: {
       </div>
     </div>
 
+    ${signature ? `
+      <div class="print-section">
+        <h3 class="print-section-title">✦ Your Travel Signature</h3>
+        <p class="print-lede">${signature.headline}</p>
+        ${listBlock('Core themes', signature.core_themes)}
+        ${listBlock('What to seek', signature.what_to_seek)}
+        ${listBlock('What to balance', signature.what_to_balance)}
+        ${listBlock('Journal prompts', signature.journal_prompts)}
+      </div>
+    ` : ''}
+
     ${mapImgDataUrl ? `
-    <div class="print-section">
-      <h3 class="print-section-title">🗺️ Global Planetary Line Map</h3>
-      <div class="print-map-wrapper">
-        <img src="${mapImgDataUrl}" class="print-map-img" alt="Astrocartography Globe Map" />
+      <div class="print-section">
+        <h3 class="print-section-title">🗺️ Global Planetary Line Map</h3>
+        <div class="print-map-wrapper"><img src="${mapImgDataUrl}" class="print-map-img" alt="Astrocartography globe map" /></div>
       </div>
-    </div>
     ` : ''}
 
-    ${topCitiesRows ? `
-    <div class="print-section">
-      <h3 class="print-section-title">✦ Top 10 Recommended Locations</h3>
-      <table class="print-table">
-        <thead>
-          <tr>
-            <th>City</th>
-            <th>Country</th>
-            <th>Score</th>
-            <th>Love</th>
-            <th>Career</th>
-            <th>Peace</th>
-            <th>Growth</th>
-            <th>Key Line Influences</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${topCitiesRows}
-        </tbody>
-      </table>
-    </div>
+    ${topRows ? `
+      <div class="print-section">
+        <h3 class="print-section-title">✦ Top Destinations</h3>
+        <table class="print-table">
+          <thead><tr><th>City</th><th>Country</th><th>Score</th><th>Love</th><th>Career</th><th>Peace</th><th>Growth</th><th>Influences</th></tr></thead>
+          <tbody>${topRows}</tbody>
+        </table>
+      </div>
     ` : ''}
 
-    ${locationIntelHTML}
+    ${selected ? `
+      <div class="print-section print-city-page">
+        <h3 class="print-section-title">📍 Deep City Narrative</h3>
+        <p class="print-lede">${selected.headline}</p>
+        <div class="print-two-col">
+          <div>${listBlock('How it may feel', selected.may_feel)}</div>
+          <div>${listBlock('What you may notice', selected.may_notice)}</div>
+        </div>
+        ${listBlock('Shadow pattern', [selected.shadow_pattern])}
+        ${listBlock('Growth invitation', [selected.growth_invitation])}
+        <div class="print-callout"><b>Catch the feeling:</b> ${selected.catch_the_feeling.feeling}<br>${selected.catch_the_feeling.exercise}</div>
+      </div>
+    ` : ''}
+
+    ${destinationNarratives}
+
+    ${couple ? `
+      <div class="print-section">
+        <h3 class="print-section-title">💑 Couple Narrative</h3>
+        <p class="print-lede">${couple.headline}</p>
+        ${listBlock('Relationship gift', [couple.relationship_gift])}
+        ${listBlock('Relationship shadow', [couple.relationship_shadow])}
+        ${listBlock('Best activities', couple.best_activities)}
+        ${listBlock('Ritual', [couple.ritual])}
+      </div>
+    ` : ''}
+
+    ${group ? `
+      <div class="print-section">
+        <h3 class="print-section-title">👥 Group Narrative</h3>
+        <p class="print-lede">${group.headline}</p>
+        ${listBlock('Shared activities', group.shared_activities)}
+        ${listBlock('Group ritual', [group.group_ritual])}
+      </div>
+    ` : ''}
+
+    ${travel.length ? `
+      <div class="print-section">
+        <h3 class="print-section-title">📅 Travel Timing Narrative</h3>
+        ${travel.slice(0, 10).map((t) => `
+          <div class="print-callout">
+            <b>${t.date || ''} · ${t.score}/100 · ${t.mood}</b><br>
+            ${t.narrative}
+            ${t.ritual ? `<br><b>Ritual:</b> ${t.ritual}` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${itinerary.length ? `
+      <div class="print-section">
+        <h3 class="print-section-title">🧭 Conscious Itinerary</h3>
+        ${itinerary.map((day) => `
+          <div class="print-callout">
+            <b>Day ${day.day} · ${day.city}</b> — ${day.theme}<br>
+            ${day.morning_intention}<br>
+            <b>Conscious task:</b> ${day.conscious_task}<br>
+            <b>Evening reflection:</b> ${day.evening_reflection}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
 
     <div class="print-section">
-      <h3 class="print-section-title">📖 Astrocartography Angle & Planet Guide</h3>
-      <div class="print-guide-grid">
-        <div class="print-guide-box">
-          <h4>Four Cardinal Angles</h4>
-          <p><b>MC (Midheaven):</b> Career, reputation, public achievement & outer purpose.<br>
-             <b>IC (Imum Coeli):</b> Home, roots, family, emotional foundation & inner peace.<br>
-             <b>ASC (Ascendant):</b> Personal identity, vitality, self-expression & physical presence.<br>
-             <b>DSC (Descendant):</b> One-on-one relationships, partnerships, marriage & attraction.</p>
-        </div>
-        <div class="print-guide-box">
-          <h4>Planetary Archetypes</h4>
-          <p><b>Benefics (Sun, Venus, Jupiter):</b> Growth, harmony, abundance, joy & social magnetism.<br>
-             <b>Intellectual (Mercury, Moon):</b> Learning, communication, intuition & emotional roots.<br>
-             <b>Transformational (Mars, Saturn, Uranus, Pluto):</b> Drive, discipline, sudden shifts & deep rebirth.</p>
-        </div>
-      </div>
+      <h3 class="print-section-title">🏡 Return-Home Integration</h3>
+      <p>${report?.integration?.headline || 'Bring the feeling home as a practice.'}</p>
+      <ul>${(report?.integration?.prompts || ['What did this place reveal?', 'What will I bring home?']).map((x) => `<li>${x}</li>`).join('')}</ul>
+      <div class="print-disclaimer">${report?.meta?.disclaimer || 'Astrology is used here as a reflective language for travel and self-awareness, not as a guarantee of events.'}</div>
     </div>
   `;
 }

@@ -24,6 +24,7 @@ from interpretations import (
 )
 from moira_engine import BODIES, _HAS_CHIRON, jd_from_iso
 from scoring_common import DOMAIN_ANGLE_BOOST, DOMAIN_HOUSES, DOMAIN_PLANETS
+from narrative.compose import compose_city_narrative
 
 _NEAR_KM = 1000.0  # only report lines/parans within this radius of the click
 
@@ -196,6 +197,23 @@ def generate_analysis(
             "parans": paran_text,
             "overall": overall,
         },
+        "narrative": compose_city_narrative(
+            city_name="",
+            country="",
+            focus="all",
+            domain_scores=_domain_scores(nearest, near_parans, planet_houses),
+            nearest_acg=nearest,
+            parans=near_parans,
+            relocated={
+                "angles": {
+                    "asc": {"sign": asc_sign},
+                    "mc": {"sign": mc_sign},
+                    "dsc": {"sign": dsc_sign},
+                    "ic": {"sign": ic_sign},
+                },
+                "planets": planet_houses,
+            },
+        ),
     }
 
 

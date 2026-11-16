@@ -19,6 +19,7 @@ from swe_engine import create_chart
 from moira_engine import BODIES, jd_from_iso, moira_reader
 from swe_engine import nodes_and_apsides_at
 from swe_engine import is_void_of_course as _is_voc
+from narrative.compose import compose_travel_narrative
 
 # ---- Scoring weights -------------------------------------------------------
 BENEFICIANS = {'Jupiter', 'Venus', 'Sun'}
@@ -302,6 +303,13 @@ def rate_travel_window(
                 'stay_score': round(stay_score, 1),
                 'departure_score': None,
                 'warnings': best_warns if include_warnings else [],
+                'narrative': compose_travel_narrative(
+                    score=best_score,
+                    influences=best_infs,
+                    warnings=best_warns if include_warnings else [],
+                    date=date_str,
+                    destination="this destination",
+                ),
             })
 
     return results

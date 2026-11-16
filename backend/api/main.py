@@ -32,6 +32,13 @@ from electional import rate_travel_window
 from returns import generate_solar_return_acg, generate_lunar_return_acg
 
 from cache import cached, payload_key
+from narrative.compose import (
+    compose_city_narrative,
+    compose_couple_narrative,
+    compose_group_narrative,
+    compose_personal_signature,
+)
+from reporting import build_report
 from cities import rank_cities_for_birth, rank_cities_for_couple, rank_cities_for_group, rank_grid_in_area
 from births import (
     create_entry,
@@ -201,6 +208,55 @@ class TripPlanRequest(BaseModel):
     stops: list[TripStop]
     total_days: int = 21
     hour_step: int = 8
+    experiential: bool = True
+    travel_style: str = "balanced"
+    interests: list[str] = []
+
+class TravelPreferences(BaseModel):
+    travel_style: str = "balanced"
+    travel_pace: str = "moderate"
+    interests: list[str] = []
+    travel_context: str = "solo"
+    desired_feeling: str = "healing"
+    budget_comfort: str = "mid"
+    notes: str = ""
+
+class TravelSignatureRequest(BaseModel):
+    birth: Birth
+    name: str = "Traveler"
+    preferences: TravelPreferences = TravelPreferences()
+
+class CoupleNarrativeRequest(BaseModel):
+    birth_a: Birth
+    birth_b: Birth
+    name_a: str = "Person A"
+    name_b: str = "Person B"
+    city_name: str = ""
+    country: str = ""
+
+class GroupNarrativeRequest(BaseModel):
+    births: list[Birth]
+    names: list[str] = []
+    city_name: str = ""
+    country: str = ""
+
+class SelectedCity(BaseModel):
+    name: str
+    country: str = ""
+    latitude: float
+    longitude: float
+
+class ReportRequest(BaseModel):
+    birth: Birth
+    name: str = "Traveler"
+    preferences: TravelPreferences = TravelPreferences()
+    focus: str = "all"
+    top_city_limit: int = 10
+    selected_city: Optional[SelectedCity] = None
+    second_birth: Optional[Birth] = None
+    companions: list[Birth] = []
+    travel_start: Optional[str] = None
+    travel_days: int = 30
 
 
 
@@ -555,6 +611,72 @@ def top_cities(req: TopCitiesRequest) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Saved birth entries
 # ---------------------------------------------------------------------------
+
+@app.post("/api/travel-signature")
+def travel_signature(req: TravelSignatureRequest) -> dict[str, Any]:
+    try:
+        prefs = req.preferences.model_dump()
+        return compose_personal_signature(req.name, prefs)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Travel signature error: {exc}")
+
+
+@app.post("/api/couple-narrative")
+def couple_narrative(req: CoupleNarrativeRequest) -> dict[str, Any]:
+    try:
+        return compose_couple_narrative(req.city_name, req.country, [req.name_a, req.name_b])
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Couple narrative error: {exc}")
+
+
+@app.post("/api/group-narrative")
+def group_narrative(req: GroupNarrativeRequest) -> dict[str, Any]:
+    try:
+        return compose_group_narrative(req.city_name, req.names)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Group narrative error: {exc}")
+
+
+@app.post("/api/report")
+def report(req: ReportRequest) -> dict[str, Any]:
+    key = payload_key("report", req.model_dump())
+    try:
+        def _run():
+            focus = req.focus
+            top_cities = rank_cities_for_birth(
+                req.birth.datetime,
+                req.birth.latitude,
+                req.birth.longitude,
+                focus=focus,
+                limit=max(1, min(50, req.top_city_limit)),
+            )
+            selected_analysis = None
+            if req.selected_city:
+                selected_analysis = generate_analysis(
+                    req.birth.datetime,
+                    req.birth.latitude,
+                    req.birth.longitude,
+                    req.selected_city.latitude,
+                    req.selected_city.longitude,
+                )
+            travel_days = []
+            if req.travel_start and req.selected_city:
+                travel_days = rate_travel_window(
+                    req.birth.datetime,
+                    req.birth.latitude,
+                    req.birth.longitude,
+                    req.selected_city.latitude,
+                    req.selected_city.longitude,
+                    req.travel_start,
+                    days=max(1, min(90, req.travel_days)),
+                )
+            trip_plan = None
+            return build_report(req, top_cities, selected_analysis, travel_days, trip_plan)
+
+        return cached(key, _run)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Report error: {exc}")
+
 
 @app.get("/api/births")
 def get_births() -> list[dict[str, Any]]:
