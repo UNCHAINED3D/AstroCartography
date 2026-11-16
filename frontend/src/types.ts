@@ -387,6 +387,9 @@ export interface TripPlanRequest {
   stops: TripStop[];
   total_days?: number;
   hour_step?: number;
+  experiential?: boolean;
+  travel_style?: string;
+  interests?: string[];
 }
 
 export interface TripPlanResponse {

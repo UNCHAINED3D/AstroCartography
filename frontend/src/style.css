@@ -1812,6 +1812,66 @@ body.fs-hide-ui * {
 .report-form label { margin-bottom: 0; }
 .report-form input, .report-form select, .report-form textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.04); color: var(--text); font-family: var(--font-sans); }
 .report-actions { margin-top: 8px; display: flex; gap: 8px; }
+.narrative-card { padding: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; }
+.person-row { font-size: 0.8rem; line-height: 1.4; margin-bottom: 4px; color: var(--muted); }
+.person-row b { color: var(--text); }
+.experiential-itinerary { margin-top: 4px; }
+.itinerary-day { margin: 8px 0; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; }
+.itinerary-day-head { margin-bottom: 6px; }
+.itinerary-city { font-family: var(--font-display); font-size: 1rem; font-weight: 600; }
+.itinerary-theme { font-size: 0.8rem; color: var(--accent); margin-top: 2px; }
+.itinerary-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 0.78rem; line-height: 1.4; padding: 2px 0; }
+.itinerary-label { color: var(--faint); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.itinerary-value { color: var(--text); }
+.itinerary-avoid { margin-top: 5px; font-size: 0.78rem; color: var(--muted); }
+.report-empty { padding: 14px; text-align: center; font-size: 0.8rem; color: var(--faint); }
+.report-empty.is-error { color: var(--danger); background: var(--danger-soft); border-radius: 8px; }
+
+/* ---- Mobile / narrow layout polish ---- */
+@media (max-width: 1100px) {
+  .panel-shell {
+    width: min(320px, calc(100vw - 24px));
+    left: 12px;
+    top: 12px;
+  }
+  #rightPanel {
+    width: min(420px, calc(100vw - 24px));
+    right: 12px;
+  }
+  .print-two-col { grid-template-columns: 1fr; }
+  .itinerary-row { grid-template-columns: 1fr; gap: 2px; }
+}
+
+@media (max-width: 720px) {
+  :root { --panel-w: calc(100vw - 24px); }
+  .panel-shell {
+    max-height: 46vh;
+  }
+  #rightPanel {
+    top: auto;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 46vh;
+  }
+  .panel-tabs {
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    flex: 1 1 40%;
+    padding: 8px 6px;
+    font-size: 0.72rem;
+  }
+  #floatingDock {
+    display: none;
+  }
+  .row-2 { grid-template-columns: 1fr; }
+  .city-cat-bars { gap: 6px; }
+  .report-form .row-2 { grid-template-columns: 1fr; }
+  .report-actions { flex-direction: column; }
+}
+
 .print-city-page { page-break-before: always; }
 .print-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .print-callout { margin: 8px 0; padding: 8px 10px; background: #f8fafc; border-left: 3px solid #2563eb; font-size: 11px; line-height: 1.45; }

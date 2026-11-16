@@ -279,6 +279,12 @@ $('planTrip')?.addEventListener('click', async () => {
       birth: { datetime: b.datetime, latitude: b.latitude, longitude: b.longitude },
       stops,
       total_days: totalDays,
+      experiential: true,
+      travel_style: ($('reportTravelStyle') as HTMLSelectElement | null)?.value || 'balanced',
+      interests: (($('reportInterests') as HTMLInputElement | null)?.value || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
     });
     const container = $('tripPlanList');
     if (!container) return;
@@ -298,7 +304,38 @@ $('planTrip')?.addEventListener('click', async () => {
       row.appendChild(inf);
       container.appendChild(row);
     });
-    setStatus(`Trip planned: ${res.itinerary.length} stops.`);
+
+    if (res.experiential_itinerary?.length) {
+      const exp = document.createElement('div');
+      exp.className = 'experiential-itinerary';
+      exp.innerHTML = `
+        <div class="travel-summary" style="margin-top:12px;">
+          <div class="travel-summary-title">🧭 Conscious Itinerary</div>
+          <div class="travel-summary-sub">Daily themes, intentions, and reflective prompts for each stop.</div>
+        </div>
+      `;
+      res.experiential_itinerary.forEach((day) => {
+        const card = document.createElement('div');
+        card.className = 'itinerary-day';
+        card.innerHTML = `
+          <div class="itinerary-day-head">
+            <div class="narrative-kicker">DAY ${day.day}${day.arrival_date ? ` · ${day.arrival_date}` : ''}</div>
+            <div class="itinerary-city">${day.city}</div>
+            <div class="itinerary-theme">${day.theme}</div>
+          </div>
+          <div class="itinerary-row"><span class="itinerary-label">Emotional focus</span><span class="itinerary-value">${day.emotional_focus}</span></div>
+          <div class="itinerary-row"><span class="itinerary-label">Morning</span><span class="itinerary-value">${day.morning_intention}</span></div>
+          <div class="itinerary-row"><span class="itinerary-label">Activity type</span><span class="itinerary-value">${day.activity_type}</span></div>
+          <div class="itinerary-row"><span class="itinerary-label">Conscious task</span><span class="itinerary-value">${day.conscious_task}</span></div>
+          <div class="itinerary-row"><span class="itinerary-label">Evening</span><span class="itinerary-value">${day.evening_reflection}</span></div>
+          <div class="itinerary-avoid"><b>Avoid:</b> ${day.avoid}</div>
+        `;
+        exp.appendChild(card);
+      });
+      container.appendChild(exp);
+    }
+
+    setStatus(`Trip planned: ${res.itinerary.length} stops${res.experiential_itinerary?.length ? ' + conscious itinerary' : ''}.`);
   } catch (err) {
     setStatus(`Trip plan error: ${(err as Error).message}`, true);
   }
@@ -446,8 +483,11 @@ $('compareSelect')?.addEventListener('change', async (e) => {
   const id = (e.target as HTMLSelectElement).value;
   const entry = savedBirthsCache.find((b) => String(b.id) === id) ?? null;
   await setCompareBirth(entry);
+  await refreshNarrativePanels();
   void loadTopCities();
 });
+
+$('companionSelect')?.addEventListener('change', () => { void refreshNarrativePanels(); });
 
 async function runAnalysis(lat: number, lng: number, isPinned: boolean): Promise<void> {
   const birth = currentBirth();
@@ -558,6 +598,16 @@ async function loadGroupNarrative(cityName = '', country = ''): Promise<void> {
   } catch {
     currentGroupNarrative = null;
   }
+}
+
+async function refreshNarrativePanels(): Promise<void> {
+  const cityName = lastAnalysisData?.narrative?.city || '';
+  const country = lastAnalysisData?.narrative?.country || '';
+  await Promise.all([
+    loadCoupleNarrative(cityName, country),
+    loadGroupNarrative(cityName, country),
+  ]);
+  renderCoupleGroupPreview();
 }
 
 globe.setHoverHandler((info: HoverInfo | null) => {
@@ -833,16 +883,53 @@ function renderCoupleGroupPreview(): void {
   const root = $('coupleGroupPreview');
   if (!root) return;
   const blocks: string[] = [];
-  if (currentSignature) {
-    blocks.push(`<div class="couple-block"><div class="narrative-kicker">TRAVEL SIGNATURE</div><div class="narrative-headline">${currentSignature.headline}</div></div>`);
-  }
+
   if (currentCoupleNarrative) {
-    blocks.push(`<div class="couple-block"><div class="narrative-kicker">COUPLE NARRATIVE</div><div class="narrative-headline">${currentCoupleNarrative.headline}</div><div class="narrative-body">${currentCoupleNarrative.relationship_gift}</div></div>`);
+    const c = currentCoupleNarrative;
+    blocks.push(`
+      <div class="narrative-card">
+        <div class="narrative-kicker">COUPLE NARRATIVE</div>
+        <div class="narrative-headline">${c.headline}</div>
+        ${c.shared_themes?.length ? `<div class="signature-tags">${c.shared_themes.map((x) => `<span class="pill">${x}</span>`).join('')}</div>` : ''}
+        <div class="signature-block"><b>Relationship gift</b><div>${c.relationship_gift}</div></div>
+        <div class="signature-block"><b>Relationship shadow</b><div>${c.relationship_shadow}</div></div>
+        <div class="signature-block"><b>Best activities</b><div>${c.best_activities.join(' · ')}</div></div>
+        <div class="signature-block"><b>Conflict forecast</b><div>${c.conflict_forecast}</div></div>
+        <div class="narrative-callout">
+          <div class="narrative-callout-title">Ritual</div>
+          <div class="narrative-callout-text">${c.ritual}</div>
+        </div>
+      </div>
+    `);
   }
+
   if (currentGroupNarrative) {
-    blocks.push(`<div class="couple-block"><div class="narrative-kicker">GROUP NARRATIVE</div><div class="narrative-headline">${currentGroupNarrative.headline}</div><div class="narrative-body">${currentGroupNarrative.group_ritual}</div></div>`);
+    const g = currentGroupNarrative;
+    blocks.push(`
+      <div class="narrative-card">
+        <div class="narrative-kicker">GROUP NARRATIVE</div>
+        <div class="narrative-headline">${g.headline}</div>
+        ${g.group_themes?.length ? `<div class="signature-tags">${g.group_themes.map((x) => `<span class="pill">${x}</span>`).join('')}</div>` : ''}
+        ${g.per_person?.length ? `
+          <div class="signature-block"><b>Per person</b>
+            ${g.per_person.map((p) => `<div class="person-row"><b>${p.name}</b> — ${p.need}. May overstimulate: ${p.may_overstimulate}. Role: ${p.role}.</div>`).join('')}
+          </div>
+        ` : ''}
+        <div class="signature-block"><b>Shared activities</b><div>${g.shared_activities.join(' · ')}</div></div>
+        <div class="signature-block"><b>Avoid</b><div>${g.avoid.join(' · ')}</div></div>
+        <div class="narrative-callout">
+          <div class="narrative-callout-title">Group ritual</div>
+          <div class="narrative-callout-text">${g.group_ritual}</div>
+        </div>
+      </div>
+    `);
   }
-  root.innerHTML = blocks.join('') || '<p class="report-empty">Select saved companions to generate a couple or group narrative.</p>';
+
+  if (!blocks.length) {
+    blocks.push('<div class="narrative-card"><div class="narrative-headline">No couple or group narrative yet</div><div class="narrative-body">Add saved companions in the Travel tab and select them to explore how a place may feel together.</div></div>');
+  }
+
+  root.innerHTML = blocks.join('');
 }
 
 async function buildReportPreview(): Promise<void> {
@@ -886,7 +973,7 @@ async function buildReportPreview(): Promise<void> {
     `;
     ($('previewPrintReport') as HTMLButtonElement | null)?.addEventListener('click', () => ($('printReport') as HTMLButtonElement)?.click());
   } catch (err) {
-    root.innerHTML = `<p class="report-empty">Report preview failed: ${(err as Error).message}</p>`;
+    root.innerHTML = `<div class="report-empty is-error">Report preview failed: ${(err as Error).message}</div>`;
   }
 }
 
@@ -1547,6 +1634,26 @@ function shareState(): ShareState {
   if (b) state.b = b;
   if (weightsDirty) state.w = cityWeights();
   state.g = currentGoalFocus;
+
+  const prefs = reportPreferences();
+  state.p = {
+    s: String(prefs.travel_style || ''),
+    pc: String(prefs.travel_pace || ''),
+    i: Array.isArray(prefs.interests) ? (prefs.interests as string[]) : [],
+    c: String(prefs.travel_context || ''),
+    f: String(prefs.desired_feeling || ''),
+    bc: String(prefs.budget_comfort || ''),
+  };
+
+  const loc = lastAnalysisData?.location;
+  if (loc) {
+    state.d = {
+      n: lastAnalysisData?.narrative?.city || 'Pinned location',
+      c: lastAnalysisData?.narrative?.country || '',
+      la: loc.latitude,
+      lo: loc.longitude,
+    };
+  }
   return state;
 }
 
@@ -1683,6 +1790,27 @@ $('printReport')?.addEventListener('click', async () => {
     }
     weightsDirty = true;
   }
+
+  if (restored.p) {
+    const setVal = (id: string, value?: string) => {
+      if (!value) return;
+      const el = $(id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) el.value = value;
+    };
+    setVal('reportTravelStyle', restored.p.s);
+    setVal('reportTravelPace', restored.p.pc);
+    setVal('reportContext', restored.p.c);
+    setVal('reportFeeling', restored.p.f);
+    setVal('reportBudget', restored.p.bc);
+    if (Array.isArray(restored.p.i)) {
+      setVal('reportInterests', restored.p.i.join(', '));
+    }
+  }
+
+  if (restored.d) {
+    setStatus(`Shared destination: ${restored.d.n}. Draw the chart, then pin it to load its narrative.`);
+  }
+
   // Redraw automatically with the shared state.
   void drawCurrentBirth();
 })();

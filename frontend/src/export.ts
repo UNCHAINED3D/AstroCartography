@@ -15,6 +15,17 @@ export interface ShareState {
   b?: { datetime: string; latitude: number; longitude: number };
   w?: Record<string, number>;
   g?: string;
+  /** Narrative / travel configuration. Notes are intentionally excluded. */
+  p?: {
+    s?: string;
+    pc?: string;
+    i?: string[];
+    c?: string;
+    f?: string;
+    bc?: string;
+  };
+  /** Selected destination for the deep-dive narrative. */
+  d?: { n: string; c: string; la: number; lo: number };
 }
 
 // ---- Generic download plumbing -------------------------------------------
