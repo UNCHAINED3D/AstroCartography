@@ -75,6 +75,46 @@ pub struct LocationAnalysisRequest {
 fn default_lat_step() -> f64 {
     1.0
 }
+#[derive(Debug, Deserialize)]
+pub struct TopCitiesRequest {
+    pub birth: Birth,
+    #[serde(default = "default_focus")]
+    pub focus: String,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub weights: Option<std::collections::HashMap<String, f64>>,
+    #[serde(default = "default_true")]
+    pub include_breakdown: bool,
+    #[serde(default)]
+    pub second_birth: Option<Birth>,
+    #[serde(default)]
+    pub births: Option<Vec<Birth>>,
+    #[serde(default)]
+    pub region: Option<String>,
+    #[serde(default)]
+    pub center_lat: Option<f64>,
+    #[serde(default)]
+    pub center_lon: Option<f64>,
+    #[serde(default)]
+    pub radius_km: Option<f64>,
+    #[serde(default)]
+    pub bbox: Option<Vec<f64>>,
+    #[serde(default)]
+    pub max_distance_from_birth_km: Option<f64>,
+    #[serde(default)]
+    pub grid: bool,
+}
+
 fn default_house_system() -> String {
     "P".to_string()
+}
+fn default_focus() -> String {
+    "all".to_string()
+}
+fn default_limit() -> i64 {
+    15
+}
+fn default_true() -> bool {
+    true
 }

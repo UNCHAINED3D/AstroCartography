@@ -1,4 +1,5 @@
 mod astro;
+mod cities;
 mod handlers;
 mod models;
 
@@ -49,7 +50,7 @@ async fn main() {
         .route("/api/fixed-stars", post(handlers::fixed_stars))
         .route("/api/midpoints", post(handlers::midpoints))
         .route("/api/crossings", post(handlers::crossings))
-        .route("/api/location-analysis", post(handlers::location_analysis))
+        .route("/api/top-cities", post(handlers::top_cities))
         .with_state(state)
         .layer(cors)
         .layer(CompressionLayer::new());

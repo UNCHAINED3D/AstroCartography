@@ -480,6 +480,42 @@ pub async fn crossings(
         .into_response()
 }
 
+pub async fn top_cities(
+    State(state): State<SharedState>,
+    Json(req): Json<TopCitiesRequest>,
+) -> impl IntoResponse {
+    use crate::cities;
+    use crate::models::TopCitiesRequest;
+    // handle grid/group/couple minimally: if births present, use primary + births? For now birth mode.
+    let birth = &req.birth;
+    let focus = req.focus.as_str();
+    let limit = req.limit.max(1) as usize;
+    let region = req.region.clone();
+    let center_lat = req.center_lat;
+    let center_lon = req.center_lon;
+    let radius_km = req.radius_km;
+    let bbox = req.bbox.clone();
+    let maxd = req.max_distance_from_birth_km;
+
+    // if second_birth or births provided, use couple mode for second_birth
+    if let Some(sb) = &req.second_birth {
+        let res = cities::rank_cities_for_couple(
+            &state.eph,
+            &birth.datetime, birth.latitude, birth.longitude,
+            &sb.datetime, sb.latitude, sb.longitude,
+            focus, limit, &req.weights,
+        );
+        return (StatusCode::OK, Json(serde_json::json!(res))).into_response();
+    }
+
+    let res = cities::rank_cities_for_birth(
+        &state.eph,
+        &birth.datetime, birth.latitude, birth.longitude,
+        focus, limit, &req.weights, req.include_breakdown,
+        &region, &center_lat, &center_lon, &radius_km, &bbox, &maxd,
+    );
+    (StatusCode::OK, Json(serde_json::json!(res))).into_response()
+}
 pub async fn location_analysis(
     State(state): State<SharedState>,
     Json(req): Json<LocationAnalysisRequest>,
